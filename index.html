@@ -397,8 +397,10 @@
     controls.enableDamping = true;
     controls.dampingFactor = 0.05;
     controls.rotateSpeed = 0.95;
-    controls.zoomSpeed = 1.1;
-    controls.panSpeed = 0.9;
+    controls.zoomSpeed = 1.15;
+    controls.panSpeed = 1.05;
+    controls.zoomToCursor = true;
+    controls.screenSpacePanning = false;
     controls.minDistance = 0.2;
     controls.maxDistance = 1400;
     controls.minPolarAngle = 0.01;
@@ -765,7 +767,8 @@
     sunLight.shadow.camera.right = d;
     sunLight.shadow.camera.top = d;
     sunLight.shadow.camera.bottom = -d;
-    sunLight.shadow.bias = -0.0004;
+    sunLight.shadow.bias = -0.0005;
+    sunLight.shadow.normalBias = 0.04;
     scene.add(sunLight);
 
     // Subtle interior light inside the 10F Cab
@@ -864,21 +867,34 @@
     const groundMat = new THREE.MeshStandardMaterial({
       color: 0x456338,
       roughness: 0.95,
-      metalness: 0.02
+      metalness: 0.02,
+      polygonOffset: true,
+      polygonOffsetFactor: 6,
+      polygonOffsetUnits: 6
     });
     const landPts = coastSamples.map((x) => [x, coastZ(x)]);
     landPts.push([COAST_EXTENT, 900], [-COAST_EXTENT, 900]);
     const ground = buildFlatShapeMesh(landPts, groundMat);
+    ground.position.y = -0.35;
     scene.add(ground);
 
     // 1b. Sandy Beach Strip along the Dayuan / Guanyin coast
-    const beachMat = new THREE.MeshStandardMaterial({ color: 0xcdbb8e, roughness: 0.97, metalness: 0.0 });
+    const beachMat = new THREE.MeshStandardMaterial({
+      color: 0xcdbb8e,
+      roughness: 0.97,
+      metalness: 0.0,
+      polygonOffset: true,
+      polygonOffsetFactor: 5,
+      polygonOffsetUnits: 5
+    });
     const beachPts = coastSamples.map((x) => [x, coastZ(x)]);
     for (let i = coastSamples.length - 1; i >= 0; i--) {
       const x = coastSamples[i];
       beachPts.push([x, coastZ(x) - BEACH_WIDTH]);
     }
-    scene.add(buildFlatShapeMesh(beachPts, beachMat));
+    const beach = buildFlatShapeMesh(beachPts, beachMat);
+    beach.position.y = -0.34;
+    scene.add(beach);
 
     // 1c. Taiwan Strait Ocean (animated procedural wave normal map)
     function createWaveNormalTexture() {
@@ -926,11 +942,15 @@
       roughness: 0.22,
       metalness: 0.15,
       normalMap: oceanNormalTex,
-      normalScale: new THREE.Vector2(0.32, 0.32)
+      normalScale: new THREE.Vector2(0.32, 0.32),
+      polygonOffset: true,
+      polygonOffsetFactor: 6,
+      polygonOffsetUnits: 6
     });
     const oceanPts = coastSamples.map((x) => [x, coastZ(x) - BEACH_WIDTH]);
     oceanPts.push([COAST_EXTENT, -COAST_EXTENT], [-COAST_EXTENT, -COAST_EXTENT]);
     const ocean = buildFlatShapeMesh(oceanPts, oceanMat);
+    ocean.position.y = -0.35;
     scene.add(ocean);
 
     // 1d. Breaking surf / foam line at the waterline
@@ -941,7 +961,7 @@
       depthWrite: false,
       polygonOffset: true,
       polygonOffsetFactor: -2,
-      polygonOffsetUnits: -2
+      polygonOffsetUnits: -4
     });
     const surfPts = coastSamples.map((x) => [x, coastZ(x) - BEACH_WIDTH + 0.4]);
     for (let i = coastSamples.length - 1; i >= 0; i--) {
@@ -949,20 +969,23 @@
       surfPts.push([x, coastZ(x) - BEACH_WIDTH - 2.2]);
     }
     const surf = buildFlatShapeMesh(surfPts, surfMat);
-    surf.position.y = 0.02;
+    surf.position.y = -0.25;
     surf.receiveShadow = false;
     scene.add(surf);
 
     // 2. Concrete Apron Spine & Service Tarmac
-    const tarmacGeo = new THREE.PlaneGeometry(560, 172);
+    const tarmacGeo = new THREE.PlaneGeometry(560, 152);
     const tarmacMat = new THREE.MeshStandardMaterial({
       color: 0x7b8187,
       roughness: 0.82,
-      metalness: 0.05
+      metalness: 0.05,
+      polygonOffset: true,
+      polygonOffsetFactor: 2,
+      polygonOffsetUnits: 2
     });
     const tarmac = new THREE.Mesh(tarmacGeo, tarmacMat);
     tarmac.rotation.x = -Math.PI / 2;
-    tarmac.position.set(0, 0.04, 0);
+    tarmac.position.set(0, -0.08, 0);
     tarmac.receiveShadow = true;
     scene.add(tarmac);
 
@@ -970,11 +993,14 @@
     const campusRoadGeo = new THREE.PlaneGeometry(118, 86);
     const asphaltMat = new THREE.MeshStandardMaterial({
       color: 0x333942,
-      roughness: 0.85
+      roughness: 0.85,
+      polygonOffset: true,
+      polygonOffsetFactor: -1,
+      polygonOffsetUnits: -2
     });
     const campusRoad = new THREE.Mesh(campusRoadGeo, asphaltMat);
     campusRoad.rotation.x = -Math.PI / 2;
-    campusRoad.position.set(-10, 0.07, 14);
+    campusRoad.position.set(-10, 0.06, 14);
     campusRoad.receiveShadow = true;
     scene.add(campusRoad);
 
@@ -983,11 +1009,14 @@
     const courtyardGeo = new THREE.PlaneGeometry(78, 56);
     const courtyardMat = new THREE.MeshStandardMaterial({
       map: courtyardTex,
-      roughness: 0.88
+      roughness: 0.88,
+      polygonOffset: true,
+      polygonOffsetFactor: -3,
+      polygonOffsetUnits: -6
     });
     const courtyardMesh = new THREE.Mesh(courtyardGeo, courtyardMat);
     courtyardMesh.rotation.x = -Math.PI / 2;
-    courtyardMesh.position.set(-8, 0.12, 14);
+    courtyardMesh.position.set(-8, 0.20, 14);
     courtyardMesh.receiveShadow = true;
     scene.add(courtyardMesh);
 
@@ -1016,7 +1045,7 @@
       crown2.castShadow = true;
       t.add(crown2);
 
-      t.position.set(x, 0.1, z);
+      t.position.set(x, 0.20, z);
       treeGroup.add(t);
     }
 
@@ -1590,7 +1619,10 @@
     const calCargoMat = new THREE.MeshStandardMaterial({
       color: 0x1e3a8a,
       roughness: 0.35,
-      metalness: 0.25
+      metalness: 0.25,
+      polygonOffset: true,
+      polygonOffsetFactor: -1,
+      polygonOffsetUnits: -2
     });
     const calCargoBuilding = new THREE.Mesh(new THREE.BoxGeometry(68, 10.5, 20), whiteCladdingMat);
     calCargoBuilding.position.set(175, 5.25, 6.5);
@@ -1605,7 +1637,10 @@
     const evaCargoMat = new THREE.MeshStandardMaterial({
       color: 0x065f46,
       roughness: 0.35,
-      metalness: 0.25
+      metalness: 0.25,
+      polygonOffset: true,
+      polygonOffsetFactor: -1,
+      polygonOffsetUnits: -2
     });
     const evaCargoBuilding = new THREE.Mesh(new THREE.BoxGeometry(46, 10.5, 20), whiteCladdingMat);
     evaCargoBuilding.position.set(232, 5.25, 6.5);
@@ -1626,33 +1661,36 @@
     const remotePadMat = new THREE.MeshStandardMaterial({
       color: 0x8a9098,
       roughness: 0.8,
-      metalness: 0.05
+      metalness: 0.05,
+      polygonOffset: true,
+      polygonOffsetFactor: -1,
+      polygonOffsetUnits: -2
     });
     // West Block pad (615 to 609, 7 bays)
     const westPad = new THREE.Mesh(new THREE.PlaneGeometry(88, 25), remotePadMat);
     westPad.rotation.x = -Math.PI / 2;
-    westPad.position.set(-148, 0.045, 71);
+    westPad.position.set(-148, 0.03, 71);
     westPad.receiveShadow = true;
     terminalGroup.add(westPad);
 
     // Middle Block pad (608 to 603, 6 bays)
     const midPad = new THREE.Mesh(new THREE.PlaneGeometry(78, 25), remotePadMat);
     midPad.rotation.x = -Math.PI / 2;
-    midPad.position.set(-11, 0.045, 71);
+    midPad.position.set(-11, 0.03, 71);
     midPad.receiveShadow = true;
     terminalGroup.add(midPad);
 
     // East Block pad (602 to 601, 2 bays)
     const eastPad = new THREE.Mesh(new THREE.PlaneGeometry(28, 25), remotePadMat);
     eastPad.rotation.x = -Math.PI / 2;
-    eastPad.position.set(62, 0.045, 71);
+    eastPad.position.set(62, 0.03, 71);
     eastPad.receiveShadow = true;
     terminalGroup.add(eastPad);
 
     // Northeast Cargo Apron pad (516 to 525, 10 bays)
     const neCargoPad = new THREE.Mesh(new THREE.PlaneGeometry(105, 25), remotePadMat);
     neCargoPad.rotation.x = -Math.PI / 2;
-    neCargoPad.position.set(201, 0.045, -72);
+    neCargoPad.position.set(201, 0.03, -72);
     neCargoPad.receiveShadow = true;
     terminalGroup.add(neCargoPad);
 
@@ -1757,18 +1795,24 @@
     ];
 
     // Reusable stand ground markings & aerobridges
-    const yellowStripeMat = new THREE.MeshBasicMaterial({ color: 0xfacc15 });
+    const yellowStripeMat = new THREE.MeshBasicMaterial({
+      color: 0xfacc15,
+      depthWrite: false,
+      polygonOffset: true,
+      polygonOffsetFactor: -4,
+      polygonOffsetUnits: -8
+    });
     const redBorderMat = new THREE.LineBasicMaterial({ color: 0xef4444 });
     const standMarkerGeo = new THREE.PlaneGeometry(3.6, 2.0);
     const leadInGeo = new THREE.PlaneGeometry(0.35, 14);
     const stopBarGeo = new THREE.PlaneGeometry(3.4, 0.45);
 
     const sbPts = [
-      new THREE.Vector3(-4.4, 0.125, -6.5),
-      new THREE.Vector3(4.4, 0.125, -6.5),
-      new THREE.Vector3(4.4, 0.125, 6.5),
-      new THREE.Vector3(-4.4, 0.125, 6.5),
-      new THREE.Vector3(-4.4, 0.125, -6.5)
+      new THREE.Vector3(-4.4, 0.16, -6.5),
+      new THREE.Vector3(4.4, 0.16, -6.5),
+      new THREE.Vector3(4.4, 0.16, 6.5),
+      new THREE.Vector3(-4.4, 0.16, 6.5),
+      new THREE.Vector3(-4.4, 0.16, -6.5)
     ];
     const safetyBoxGeo = new THREE.BufferGeometry().setFromPoints(sbPts);
 
@@ -1779,11 +1823,15 @@
       // 1. Painted Stand Number Plate on tarmac
       const markerMat = new THREE.MeshBasicMaterial({
         map: getStandTexture(bay.id),
-        transparent: true
+        transparent: true,
+        depthWrite: false,
+        polygonOffset: true,
+        polygonOffsetFactor: -5,
+        polygonOffsetUnits: -10
       });
       const markerMesh = new THREE.Mesh(standMarkerGeo, markerMat);
       markerMesh.rotation.x = -Math.PI / 2;
-      markerMesh.position.set(bay.pos.x, 0.13, bay.pos.z + (isNorthSide ? -7.2 : 7.2));
+      markerMesh.position.set(bay.pos.x, 0.18, bay.pos.z + (isNorthSide ? -7.2 : 7.2));
       markerMesh.userData.bayData = bay;
       terminalGroup.add(markerMesh);
       interactiveMeshes.push(markerMesh);
@@ -1791,13 +1839,13 @@
       // 2. Yellow Taxi-In Centerline Lead-in
       const leadIn = new THREE.Mesh(leadInGeo, yellowStripeMat);
       leadIn.rotation.x = -Math.PI / 2;
-      leadIn.position.set(bay.pos.x, 0.12, bay.pos.z);
+      leadIn.position.set(bay.pos.x, 0.15, bay.pos.z);
       terminalGroup.add(leadIn);
 
       // 3. Yellow Stop Bar (T-Bar)
       const stopBar = new THREE.Mesh(stopBarGeo, yellowStripeMat);
       stopBar.rotation.x = -Math.PI / 2;
-      stopBar.position.set(bay.pos.x, 0.125, bay.pos.z + (isNorthSide ? 4.2 : -4.2));
+      stopBar.position.set(bay.pos.x, 0.16, bay.pos.z + (isNorthSide ? 4.2 : -4.2));
       terminalGroup.add(stopBar);
 
       // 4. Red Apron Equipment Safety Zone Outline
@@ -1894,12 +1942,26 @@
     const runwayMat = new THREE.MeshStandardMaterial({
       map: runwayTex,
       roughness: 0.78,
-      metalness: 0.06
+      metalness: 0.06,
+      polygonOffset: true,
+      polygonOffsetFactor: -4,
+      polygonOffsetUnits: -8
     });
 
     const taxiwayMat = new THREE.MeshStandardMaterial({
       color: 0x454c54,
-      roughness: 0.82
+      roughness: 0.82,
+      polygonOffset: true,
+      polygonOffsetFactor: -2,
+      polygonOffsetUnits: -4
+    });
+
+    const exitTaxiwayMat = new THREE.MeshStandardMaterial({
+      color: 0x454c54,
+      roughness: 0.82,
+      polygonOffset: true,
+      polygonOffsetFactor: -1,
+      polygonOffsetUnits: -2
     });
 
     const runwayPositionsZ = [-108, 108]; // North Runway (05L/23R) & South Runway (05R/23L)
@@ -1909,7 +1971,7 @@
       const rwyGeo = new THREE.PlaneGeometry(560, 32);
       const rwy = new THREE.Mesh(rwyGeo, runwayMat);
       rwy.rotation.x = -Math.PI / 2;
-      rwy.position.set(0, 0.14, zPos);
+      rwy.position.set(0, 0.16, zPos);
       rwy.receiveShadow = true;
       runwaysGroup.add(rwy);
 
@@ -1917,25 +1979,26 @@
       const pTaxiZ = zPos > 0 ? zPos - 28 : zPos + 28;
       const pTaxi = new THREE.Mesh(new THREE.PlaneGeometry(540, 14), taxiwayMat);
       pTaxi.rotation.x = -Math.PI / 2;
-      pTaxi.position.set(0, 0.11, pTaxiZ);
+      pTaxi.position.set(0, 0.08, pTaxiZ);
       pTaxi.receiveShadow = true;
       runwaysGroup.add(pTaxi);
 
       // Yellow taxiway centerline stripe
       const yellowLine = new THREE.Mesh(
         new THREE.PlaneGeometry(530, 0.45),
-        new THREE.MeshBasicMaterial({ color: 0xfacc15 })
+        yellowStripeMat
       );
       yellowLine.rotation.x = -Math.PI / 2;
-      yellowLine.position.set(0, 0.13, pTaxiZ);
+      yellowLine.position.set(0, 0.14, pTaxiZ);
       runwaysGroup.add(yellowLine);
 
-      // High-Speed Exit Taxiways
+      // High-Speed Exit Taxiways (tucked cleanly between parallel taxiway and runway)
       for (const xPos of [-140, -50, 50, 140]) {
-        const exitTaxi = new THREE.Mesh(new THREE.PlaneGeometry(11, 34), taxiwayMat);
+        const exitTaxi = new THREE.Mesh(new THREE.PlaneGeometry(10, 24), exitTaxiwayMat);
         exitTaxi.rotation.x = -Math.PI / 2;
-        exitTaxi.position.set(xPos, 0.12, (zPos + pTaxiZ) * 0.5);
+        exitTaxi.position.set(xPos, 0.01, (zPos + pTaxiZ) * 0.5);
         exitTaxi.rotation.z = zPos > 0 ? 0.42 : -0.42;
+        exitTaxi.receiveShadow = true;
         runwaysGroup.add(exitTaxi);
       }
 
@@ -3207,7 +3270,7 @@
 
       // Vertical Y mapping
       const sy = (onGround || altFeet <= 75)
-        ? 0.14
+        ? 0.16
         : Math.min(145, 2.2 + Math.pow(Math.max(0, altFeet) / 100, 0.72) * 1.45);
 
       return { x: sx, y: sy, z: sz };
@@ -3266,81 +3329,113 @@
       return entry;
     }
 
-    // Seed initial RCTP aircraft immediately so the airfield is rich and interactive on frame 0 (even on local file:// or before first poll)
-    let dynamicSimStep = 0;
-    function getDynamicRctpFlights() {
-      dynamicSimStep += 1;
-      const t = dynamicSimStep;
+    // Continuous 60 FPS trajectory generator for simulated RCTP flights (no stepped poll jumps or snap-backs)
+    const GROUND_SURFACE_Y = 0.16;
+    function getDynamicRctpFlights(elapsedSec = 0) {
+      const t = Math.max(0, elapsedSec);
 
-      // Cycle 1: Realistic Arrival on RWY 05L (2-minute cycle)
-      const arrProgress = ((t % 24) / 24);
-      let arrX, arrY, arrOnGnd, arrAlt, arrGs, arrPhase;
-      if (arrProgress < 0.6) {
-        // Final approach glide path
-        arrX = -260 + arrProgress * 300;
-        arrY = Math.max(0.14, 42 * (1 - arrProgress / 0.6));
+      // Cycle 1: Realistic Arrival on RWY 05L (75-second continuous cycle)
+      const arrCycleDur = 75.0;
+      const arrT = (t % arrCycleDur);
+      const arrCycleIndex = Math.floor(t / arrCycleDur);
+      let arrX, arrY, arrOnGnd, arrAlt, arrGs, arrPhase, arrPitch, arrVrate;
+      if (arrT < 42.0) {
+        // Final approach glide path along RWY 05L (-460 -> -160)
+        const p = arrT / 42.0;
+        arrX = -460 + p * 300;
+        // Smooth flare over last 12% before touchdown
+        const flare = p > 0.88 ? Math.pow((p - 0.88) / 0.12, 2) * 0.8 : 0;
+        arrY = Math.max(GROUND_SURFACE_Y, GROUND_SURFACE_Y + (1 - p) * 66 - flare);
         arrOnGnd = false;
-        arrAlt = Math.round(1850 * (1 - arrProgress / 0.6));
-        arrGs = 142;
+        arrAlt = Math.max(20, Math.round(2100 * (1 - p)));
+        arrGs = Math.round(144 - p * 8);
+        arrVrate = -720;
+        arrPitch = p > 0.82 ? 0.055 : 0.02;
         arrPhase = 'APPROACH 05L';
-      } else {
-        // Rollout & deceleration on 05L
-        const rolloutP = (arrProgress - 0.6) / 0.4;
-        arrX = -80 + rolloutP * 160;
-        arrY = 0.14;
+      } else if (arrT < 65.0) {
+        // Touchdown & smooth deceleration rollout on RWY 05L (-160 -> +95)
+        const p = (arrT - 42.0) / 23.0;
+        const decelEase = 1 - Math.pow(1 - p, 1.85);
+        arrX = -160 + decelEase * 255;
+        arrY = GROUND_SURFACE_Y;
         arrOnGnd = true;
         arrAlt = 0;
-        arrGs = Math.max(16, Math.round(125 * (1 - rolloutP * 0.85)));
-        arrPhase = arrGs > 35 ? 'ROLLOUT 05L' : 'TAXI NP';
+        arrGs = Math.max(22, Math.round(136 * (1 - p * 0.84)));
+        arrVrate = 0;
+        arrPitch = 0;
+        arrPhase = arrGs > 40 ? 'ROLLOUT 05L' : 'TAXI 05L';
+      } else {
+        // Steady taxi rollout (+95 -> +145)
+        const p = (arrT - 65.0) / 10.0;
+        arrX = 95 + p * 50;
+        arrY = GROUND_SURFACE_Y;
+        arrOnGnd = true;
+        arrAlt = 0;
+        arrGs = 22;
+        arrVrate = 0;
+        arrPitch = 0;
+        arrPhase = 'TAXI 05L';
       }
 
-      // Cycle 2: Realistic Departure on RWY 05R (2.5-minute cycle)
-      const depProgress = (((t + 10) % 28) / 28);
-      let depX, depY, depOnGnd, depAlt, depGs, depPhase;
-      if (depProgress < 0.4) {
-        // Takeoff roll on 05R
-        depX = -130 + depProgress * 380;
-        depY = 0.14;
+      // Cycle 2: Realistic Departure on RWY 05R (80-second continuous cycle)
+      const depCycleDur = 80.0;
+      const depT = ((t + 18.0) % depCycleDur);
+      const depCycleIndex = Math.floor((t + 18.0) / depCycleDur);
+      let depX, depY, depOnGnd, depAlt, depGs, depPhase, depPitch, depVrate;
+      if (depT < 26.0) {
+        // Takeoff roll on RWY 05R (-230 -> 0) with realistic acceleration and VR rotation
+        const p = depT / 26.0;
+        const accelEase = Math.pow(p, 1.75);
+        depX = -230 + accelEase * 230;
+        depY = GROUND_SURFACE_Y;
         depOnGnd = true;
         depAlt = 0;
-        depGs = Math.round(35 + (depProgress / 0.4) * 135);
+        depGs = Math.round(15 + p * 153);
+        depVrate = 0;
+        depPitch = p > 0.80 ? ((p - 0.80) / 0.20) * 0.145 : 0;
         depPhase = 'TAKEOFF ROLL 05R';
       } else {
-        // Climb out
-        const climbP = (depProgress - 0.4) / 0.6;
-        depX = 22 + climbP * 240;
-        depY = 0.14 + climbP * 58;
+        // Continuous climb out (0 -> +480, climbing smoothly to y = 118)
+        const p = (depT - 26.0) / 54.0;
+        depX = p * 480;
+        depY = GROUND_SURFACE_Y + Math.pow(p, 1.08) * 118;
         depOnGnd = false;
-        depAlt = Math.round(climbP * 3400);
-        depGs = Math.round(170 + climbP * 70);
+        depAlt = Math.round(p * 4200);
+        depGs = Math.round(168 + p * 68);
+        depVrate = 2200;
+        depPitch = 0.145;
         depPhase = 'CLIMB RWY 05R';
       }
 
-      // Cycle 3: Taxi traffic on NP
-      const taxiProgress = ((t % 18) / 18);
-      const taxiX = 70 - taxiProgress * 150;
+      // Cycle 3: Continuous Taxi traffic on North Parallel Taxiway NP (z = -80)
+      const taxiCycleDur = 90.0;
+      const taxiT = (t % taxiCycleDur);
+      const taxiCycleIndex = Math.floor(t / taxiCycleDur);
+      const taxiProgress = taxiT / taxiCycleDur;
+      const taxiX = 185 - taxiProgress * 370;
 
       return [
-        { id: 'live_gate1', callsign: 'CI721', displayFlight: 'CI721', airlineCode: 'CAL', type: 'B77W', reg: 'B-18005', route: 'TPE→KUL', alt: 0, gs: 0, heading: 137.8, vrate: 0, onGround: true, phase: 'GATE D3', alongMeters: -100, crossMeters: -45, distMeters: 450, pos: { x: -116, y: 0.14, z: -52 } },
-        { id: 'live_gate2', callsign: 'BR132', displayFlight: 'BR132', airlineCode: 'EVA', type: 'B78X', reg: 'B-17811', route: 'TPE→KIX', alt: 0, gs: 0, heading: 317.8, vrate: 0, onGround: true, phase: 'GATE C4', alongMeters: -120, crossMeters: 45, distMeters: 520, pos: { x: -128, y: 0.14, z: 52 } },
-        { id: 'live_gate3', callsign: 'JX820', displayFlight: 'JX820', airlineCode: 'SJX', type: 'A359', reg: 'B-58507', route: 'TPE→KIX', alt: 0, gs: 0, heading: 137.8, vrate: 0, onGround: true, phase: 'GATE D6', alongMeters: -140, crossMeters: -45, distMeters: 610, pos: { x: -152, y: 0.14, z: -52 } },
-        { id: 'live_gate4', callsign: 'CX495', displayFlight: 'CX495', airlineCode: 'CPA', type: 'A333', reg: 'B-HLV',   route: 'HKG→TPE', alt: 0, gs: 0, heading: 137.8, vrate: 0, onGround: true, phase: 'GATE A5', alongMeters: 140, crossMeters: -45, distMeters: 590, pos: { x: 144, y: 0.14, z: -52 } },
-        { id: 'live_rem1',  callsign: 'IT201', displayFlight: 'IT201', airlineCode: 'TTW', type: 'A320', reg: 'B-50015', route: 'TPE→NRT', alt: 0, gs: 0, heading: 317.8, vrate: 0, onGround: true, phase: 'STAND 607', alongMeters: -30, crossMeters: 65, distMeters: 410, pos: { x: -31, y: 0.14, z: 71 } },
-        { id: 'live_crg1',  callsign: 'BR628', displayFlight: 'BR628', airlineCode: 'EVA', type: 'B77W', reg: 'B-16781', route: 'TPE→LAX', alt: 0, gs: 0, heading: 317.8, vrate: 0, onGround: true, phase: 'CARGO 506', alongMeters: 180, crossMeters: -10, distMeters: 680, pos: { x: 182, y: 0.14, z: -8 } },
-        { id: 'live_crg2',  callsign: 'CI5242', displayFlight: 'CI5242', airlineCode: 'CAL', type: 'B744', reg: 'B-18712', route: 'TPE→ANC', alt: 0, gs: 0, heading: 137.8, vrate: 0, onGround: true, phase: 'CARGO 518', alongMeters: 175, crossMeters: -70, distMeters: 750, pos: { x: 176, y: 0.14, z: -72 } },
-        { id: 'live_arr',   callsign: 'BR212', displayFlight: 'BR212', airlineCode: 'EVA', type: 'B77W', reg: 'B-16727', route: 'BKK→TPE', alt: arrAlt, gs: arrGs, heading: 47.8, vrate: arrOnGnd ? 0 : -680, onGround: arrOnGnd, phase: arrPhase, alongMeters: arrX * 8, crossMeters: -1142, distMeters: Math.round(Math.abs(arrX * 8)), pos: { x: arrX, y: arrY, z: -108 } },
-        { id: 'live_dep',   callsign: 'JX800', displayFlight: 'JX800', airlineCode: 'SJX', type: 'A35K', reg: 'B-58553', route: 'TPE→NRT', alt: depAlt, gs: depGs, heading: 47.8, vrate: depOnGnd ? 0 : 2100, onGround: depOnGnd, phase: depPhase, alongMeters: depX * 8, crossMeters: 741, distMeters: Math.round(Math.abs(depX * 8)), pos: { x: depX, y: depY, z: 108 } },
-        { id: 'live_taxi',  callsign: 'CI501', displayFlight: 'CI501', airlineCode: 'CAL', type: 'A359', reg: 'B-18910', route: 'TPE→PVG', alt: 0, gs: 15, heading: 227.8, vrate: 0, onGround: true, phase: 'TAXI NP', alongMeters: taxiX * 8, crossMeters: -80, distMeters: Math.round(Math.abs(taxiX * 8)), pos: { x: taxiX, y: 0.14, z: -65 } }
+        { id: 'live_gate1', isSimulated: true, cycleIndex: 0, callsign: 'CI721', displayFlight: 'CI721', airlineCode: 'CAL', type: 'B77W', reg: 'B-18005', route: 'TPE→KUL', alt: 0, gs: 0, heading: 137.8, vrate: 0, pitch: 0, onGround: true, phase: 'GATE D3', alongMeters: -100, crossMeters: -45, distMeters: 450, pos: { x: -116, y: GROUND_SURFACE_Y, z: -52 } },
+        { id: 'live_gate2', isSimulated: true, cycleIndex: 0, callsign: 'BR132', displayFlight: 'BR132', airlineCode: 'EVA', type: 'B78X', reg: 'B-17811', route: 'TPE→KIX', alt: 0, gs: 0, heading: 317.8, vrate: 0, pitch: 0, onGround: true, phase: 'GATE C4', alongMeters: -120, crossMeters: 45, distMeters: 520, pos: { x: -128, y: GROUND_SURFACE_Y, z: 52 } },
+        { id: 'live_gate3', isSimulated: true, cycleIndex: 0, callsign: 'JX820', displayFlight: 'JX820', airlineCode: 'SJX', type: 'A359', reg: 'B-58507', route: 'TPE→KIX', alt: 0, gs: 0, heading: 137.8, vrate: 0, pitch: 0, onGround: true, phase: 'GATE D6', alongMeters: -140, crossMeters: -45, distMeters: 610, pos: { x: -152, y: GROUND_SURFACE_Y, z: -52 } },
+        { id: 'live_gate4', isSimulated: true, cycleIndex: 0, callsign: 'CX495', displayFlight: 'CX495', airlineCode: 'CPA', type: 'A333', reg: 'B-HLV',   route: 'HKG→TPE', alt: 0, gs: 0, heading: 137.8, vrate: 0, pitch: 0, onGround: true, phase: 'GATE A5', alongMeters: 140, crossMeters: -45, distMeters: 590, pos: { x: 144, y: GROUND_SURFACE_Y, z: -52 } },
+        { id: 'live_rem1',  isSimulated: true, cycleIndex: 0, callsign: 'IT201', displayFlight: 'IT201', airlineCode: 'TTW', type: 'A320', reg: 'B-50015', route: 'TPE→NRT', alt: 0, gs: 0, heading: 317.8, vrate: 0, pitch: 0, onGround: true, phase: 'STAND 607', alongMeters: -30, crossMeters: 65, distMeters: 410, pos: { x: -31, y: GROUND_SURFACE_Y, z: 71 } },
+        { id: 'live_crg1',  isSimulated: true, cycleIndex: 0, callsign: 'BR628', displayFlight: 'BR628', airlineCode: 'EVA', type: 'B77W', reg: 'B-16781', route: 'TPE→LAX', alt: 0, gs: 0, heading: 317.8, vrate: 0, pitch: 0, onGround: true, phase: 'CARGO 506', alongMeters: 180, crossMeters: -10, distMeters: 680, pos: { x: 182, y: GROUND_SURFACE_Y, z: -8 } },
+        { id: 'live_crg2',  isSimulated: true, cycleIndex: 0, callsign: 'CI5242', displayFlight: 'CI5242', airlineCode: 'CAL', type: 'B744', reg: 'B-18712', route: 'TPE→ANC', alt: 0, gs: 0, heading: 137.8, vrate: 0, pitch: 0, onGround: true, phase: 'CARGO 518', alongMeters: 175, crossMeters: -70, distMeters: 750, pos: { x: 176, y: GROUND_SURFACE_Y, z: -72 } },
+        { id: 'live_arr',   isSimulated: true, cycleIndex: arrCycleIndex, callsign: 'BR212', displayFlight: 'BR212', airlineCode: 'EVA', type: 'B77W', reg: 'B-16727', route: 'BKK→TPE', alt: arrAlt, gs: arrGs, heading: 47.8, vrate: arrVrate, pitch: arrPitch, onGround: arrOnGnd, phase: arrPhase, alongMeters: arrX * 8, crossMeters: -1142, distMeters: Math.round(Math.abs(arrX * 8)), pos: { x: arrX, y: arrY, z: -108 } },
+        { id: 'live_dep',   isSimulated: true, cycleIndex: depCycleIndex, callsign: 'JX800', displayFlight: 'JX800', airlineCode: 'SJX', type: 'A35K', reg: 'B-58553', route: 'TPE→NRT', alt: depAlt, gs: depGs, heading: 47.8, vrate: depVrate, pitch: depPitch, onGround: depOnGnd, phase: depPhase, alongMeters: depX * 8, crossMeters: 741, distMeters: Math.round(Math.abs(depX * 8)), pos: { x: depX, y: depY, z: 108 } },
+        { id: 'live_taxi',  isSimulated: true, cycleIndex: taxiCycleIndex, callsign: 'CI501', displayFlight: 'CI501', airlineCode: 'CAL', type: 'A359', reg: 'B-18910', route: 'TPE→PVG', alt: 0, gs: 18, heading: 227.8, vrate: 0, pitch: 0, onGround: true, phase: 'TAXI NP', alongMeters: taxiX * 8, crossMeters: -80, distMeters: Math.round(Math.abs(taxiX * 8)), pos: { x: taxiX, y: GROUND_SURFACE_Y, z: -80 } }
       ];
     }
 
     function seedInitialFlights() {
-      const initialDefs = getDynamicRctpFlights();
+      const initialDefs = getDynamicRctpFlights(0);
       initialDefs.forEach((f) => {
         const ent = upsertAircraftEntity({ ...f, role: 'live_adsb' });
         ent.targetPos = new THREE.Vector3(f.pos.x, f.pos.y, f.pos.z);
         ent.group.position.copy(ent.targetPos);
         ent.initializedPos = true;
+        ent.lastCycleIndex = f.cycleIndex;
       });
       renderLiveFlightsUI(initialDefs);
     }
@@ -3481,8 +3576,9 @@
       isRealLiveNetworkActive = isLiveSource;
 
       // 2. If no live transponder feed available, fallback to dynamic simulator
+      const nowElapsedSec = performance.now() * 0.001;
       if (parsedFlights.length === 0) {
-        parsedFlights = getDynamicRctpFlights();
+        parsedFlights = getDynamicRctpFlights(nowElapsedSec);
       }
 
       if (parsedFlights.length === 0) return;
@@ -3505,10 +3601,42 @@
           role: 'live_adsb',
           phase
         });
-        ent.targetPos = new THREE.Vector3(scenePos.x, scenePos.y, scenePos.z);
-        if (!ent.initializedPos) {
-          ent.group.position.copy(ent.targetPos);
-          ent.initializedPos = true;
+
+        if (f.isSimulated) {
+          // Simulated flights are updated continuously every frame in animate(); only initialize if new
+          if (!ent.initializedPos) {
+            ent.targetPos = new THREE.Vector3(scenePos.x, scenePos.y, scenePos.z);
+            ent.group.position.copy(ent.targetPos);
+            ent.initializedPos = true;
+            ent.lastCycleIndex = f.cycleIndex;
+          }
+        } else {
+          // Real live ADS-B flight: only update targetPos if GPS coordinates actually changed
+          // so cached network polls never snap dead-reckoned aircraft backward
+          const gpsChanged = (ent.lastLat !== f.lat) || (ent.lastLon !== f.lon) || !ent.initializedPos;
+          if (gpsChanged) {
+            ent.lastLat = f.lat;
+            ent.lastLon = f.lon;
+            const newTarget = new THREE.Vector3(scenePos.x, scenePos.y, scenePos.z);
+            if (!ent.initializedPos || ent.group.position.distanceTo(newTarget) > 90) {
+              ent.targetPos = newTarget;
+              ent.group.position.copy(newTarget);
+              ent.initializedPos = true;
+            } else {
+              // Ensure new poll target doesn't pull an airborne aircraft backward along its heading
+              const relRad = (((f.heading || 48) - RCTP_REF.rwyHeadingDeg) * Math.PI) / 180.0;
+              const fwdX = Math.cos(relRad);
+              const fwdZ = Math.sin(relRad);
+              const dx = newTarget.x - ent.group.position.x;
+              const dz = newTarget.z - ent.group.position.z;
+              const alongTrack = dx * fwdX + dz * fwdZ;
+              if (alongTrack >= -2.0 || (f.gs || 0) < 5) {
+                ent.targetPos = newTarget;
+              } else {
+                ent.targetPos.y = newTarget.y;
+              }
+            }
+          }
         }
       });
 
@@ -3585,6 +3713,80 @@
       });
     }
 
+    // Collect 3D building/terminal obstacle meshes so camera never positions behind a wall
+    const buildingObstacleMeshes = [];
+    [newTowerGroup, baseBuildingGroup, terminalGroup].forEach((grp) => {
+      grp.traverse((child) => {
+        if (child.isMesh && child.geometry && child.geometry.type !== 'PlaneGeometry') {
+          buildingObstacleMeshes.push(child);
+        }
+      });
+    });
+    const losRaycaster = new THREE.Raycaster();
+
+    // Compute an unobstructed 3/4 close-up camera view for any aircraft on the airfield
+    function computeUnobstructedAircraftView(pPos, flightData, zoom = 1.0) {
+      const desiredTarget = new THREE.Vector3(pPos.x, pPos.y + 2.4, pPos.z);
+
+      // Determine the open apron / runway side away from terminal concourses & cargo warehouses:
+      // - NE Cargo (516-525, z ~ -72, x > 140) has warehouse at z = -84 -> open side is +Z (+1)
+      // - North Piers D & A (z ~ -52) have Concourses D & A at z = -40, and East Cargo (z ~ -8) has Cargo Terminal at z = +6.5 -> open side is -Z (-1)
+      // - South Piers C & B (z ~ +52), Remote Apron (z ~ +71), South Runway (z ~ +108) -> open side is +Z (+1)
+      let openZSign = 1;
+      if (pPos.z < -60 && pPos.x > 140) {
+        openZSign = 1;
+      } else if (pPos.z < -4) {
+        openZSign = -1;
+      } else {
+        openZSign = 1;
+      }
+
+      const dX = 24 * zoom;
+      const dY = Math.max(9.5, 12.5 * zoom);
+      const dZ = 30 * zoom;
+
+      const candidateOffsets = [
+        new THREE.Vector3(-dX, dY, openZSign * dZ),
+        new THREE.Vector3(dX, dY, openZSign * dZ),
+        new THREE.Vector3(0, dY + 2.0, openZSign * (dZ + 4)),
+        new THREE.Vector3(-dX, dY + 3.5, -openZSign * dZ),
+        new THREE.Vector3(dX, dY + 3.5, -openZSign * dZ),
+        new THREE.Vector3(-dX * 0.8, dY + 12.0, openZSign * dZ * 0.85)
+      ];
+
+      scene.updateMatrixWorld();
+      for (const off of candidateOffsets) {
+        const candCam = new THREE.Vector3(pPos.x + off.x, Math.max(6.5, pPos.y + off.y), pPos.z + off.z);
+        const dir = candCam.clone().sub(desiredTarget);
+        const maxDist = dir.length();
+        dir.normalize();
+        losRaycaster.set(desiredTarget, dir);
+        losRaycaster.near = 1.5;
+        losRaycaster.far = maxDist;
+        const hits = losRaycaster.intersectObjects(buildingObstacleMeshes, false);
+        if (hits.length === 0) {
+          // Also verify reverse ray (from camera to aircraft) in case of single-sided faces
+          losRaycaster.set(candCam, dir.clone().negate());
+          losRaycaster.near = 0.5;
+          losRaycaster.far = maxDist - 1.5;
+          const revHits = losRaycaster.intersectObjects(buildingObstacleMeshes, false);
+          if (revHits.length === 0) {
+            return { camPos: candCam, targetPos: desiredTarget };
+          }
+        }
+      }
+
+      // Elevated unobstructed fallback
+      return {
+        camPos: new THREE.Vector3(pPos.x - dX, Math.max(18.0, pPos.y + dY + 10.0), pPos.z + openZSign * dZ),
+        targetPos: desiredTarget
+      };
+    }
+
+    let isFlyingToTrackedAircraft = false;
+    let trackedPrevPos = null;
+    let isCabInteriorMode = (viewParam === 'cabInterior');
+
     function focusOnFlight(flightData) {
       let targetEntry = null;
       for (const ent of activeAircraftMap.values()) {
@@ -3595,7 +3797,18 @@
       }
       if (!targetEntry) return;
 
+      isCabInteriorMode = false;
       trackedFlightId = targetEntry.id;
+      pinnedFlightId = targetEntry.id;
+      showOnlyAircraftTag(targetEntry.id);
+      followZoom = 1.0;
+      isFlyingToTrackedAircraft = true;
+      trackedPrevPos = targetEntry.group.position.clone();
+      cameraGoalPos = null;
+      targetGoalPos = null;
+      zoomGoalPos = null;
+      zoomGoalTarget = null;
+
       const stopBtn = document.getElementById('stop-track-btn');
       if (stopBtn) stopBtn.classList.remove('hidden');
 
@@ -3741,7 +3954,9 @@
       const data = LANDMARKS[key];
       if (!data) return;
 
+      isCabInteriorMode = (key === 'cabInterior');
       trackedFlightId = null;
+      isFlyingToTrackedAircraft = false;
       const stopBtn = document.getElementById('stop-track-btn');
       if (stopBtn) stopBtn.classList.add('hidden');
 
@@ -3775,10 +3990,18 @@
     }
 
     function selectBay(bay) {
-      const camY = 24;
-      const offsetZ = bay.pos.z > 0 ? 32 : -32;
-      cameraGoalPos = new THREE.Vector3(bay.pos.x - 8, camY, bay.pos.z + offsetZ);
-      targetGoalPos = new THREE.Vector3(bay.pos.x, 2, bay.pos.z);
+      isCabInteriorMode = false;
+      trackedFlightId = null;
+      isFlyingToTrackedAircraft = false;
+      const stopBtn = document.getElementById('stop-track-btn');
+      if (stopBtn) stopBtn.classList.add('hidden');
+
+      const camY = 22;
+      // NE Cargo (516-525 at z = -72) has warehouse at z = -84 -> view from +Z (+30); other north stands view from -Z (-32)
+      const isNeCargo = bay.pos.z < -60 && bay.pos.x > 140;
+      const offsetZ = isNeCargo ? 30 : (bay.pos.z > 0 ? 32 : -32);
+      cameraGoalPos = new THREE.Vector3(bay.pos.x - 12, camY, bay.pos.z + offsetZ);
+      targetGoalPos = new THREE.Vector3(bay.pos.x, 2.2, bay.pos.z);
       zoomGoalPos = null;
       zoomGoalTarget = null;
 
@@ -3804,12 +4027,12 @@
       card.classList.add('translate-x-0', 'opacity-100', 'pointer-events-auto');
     }
 
-    // --- RAYCASTER FOR CLICKING 3D LANDMARKS & REAL-TIME AIRCRAFT ---
+    // --- RAYCASTER FOR CLICKING 3D LANDMARKS, REAL-TIME AIRCRAFT & MAP NAVIGATION ---
     const raycaster = new THREE.Raycaster();
     const pointer = new THREE.Vector2();
+    const mapGroundPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), -GROUND_SURFACE_Y);
     let pointerDownPos = { x: 0, y: 0 };
     let pinnedFlightId = null;
-    let lastTouchAircraftTap = null;
 
     function showOnlyAircraftTag(flightId) {
       for (const ent of activeAircraftMap.values()) {
@@ -3825,11 +4048,165 @@
       return hit ? activeAircraftMap.get(hit.object.userData.flightId) : null;
     }
 
+    // Raycast screen coordinates to the 3D airport map ground plane (avoids snapping zoom onto the vertical control tower shaft)
+    function getMapPointAtScreen(clientX, clientY) {
+      pointer.x = (clientX / window.innerWidth) * 2 - 1;
+      pointer.y = -(clientY / window.innerHeight) * 2 + 1;
+      raycaster.setFromCamera(pointer, camera);
+
+      const groundHit = new THREE.Vector3();
+      if (raycaster.ray.intersectPlane(mapGroundPlane, groundHit)) {
+        groundHit.x = THREE.MathUtils.clamp(groundHit.x, -520, 520);
+        groundHit.y = 1.6;
+        groundHit.z = THREE.MathUtils.clamp(groundHit.z, -420, 420);
+        // Keep zoom target outside the ATC control tower shaft footprint so zooming never traps the camera against the tower
+        const distFromTower = Math.hypot(groundHit.x + 0.45, groundHit.z);
+        if (distFromTower < 14.0) {
+          const angle = Math.atan2(groundHit.z, groundHit.x + 0.45);
+          groundHit.x = -0.45 + Math.cos(angle) * 16.0;
+          groundHit.z = Math.sin(angle) * 16.0;
+        }
+        return groundHit;
+      }
+
+      const fallback = new THREE.Vector3();
+      camera.getWorldDirection(fallback);
+      fallback.y = Math.min(-0.1, fallback.y);
+      fallback.normalize();
+      const pt = camera.position.clone().addScaledVector(fallback, 45);
+      pt.y = 1.6;
+      return pt;
+    }
+
+    // --- ZOOM TOWARD CURSOR / PINCH / DOUBLE-TAP & FREE MAP NAVIGATION ---
+    const DBL_CLICK_MS = 300;
+    const ZOOM_IN_FACTOR = 0.48;
+    const ZOOM_OUT_FACTOR = 2.0;
+    const MIN_FREE_ORBIT_DIST = 16.0; // Prevents OrbitControls from getting stuck or losing pan speed
+    let zoomGoalPos = null;
+    let zoomGoalTarget = null;
+    let followZoom = 1.0;
+    let lastPointerType = 'mouse';
+    let lastRightDown = null;
+    let pendingClickTimer = null;
+
+    // Touch gesture tracking for pinch-to-point, double-tap & double-tap-and-drag zoom
+    const activeTouchPointers = new Map();
+    let lastPinchDist = null;
+    let lastPinchFocusPt = null;
+    let lastSingleTouchTap = null; // { time, x, y }
+    let touchDoubleTapDrag = null; // { pointerId, startX, startY, lastY, focusPoint, isDragging }
+
+    function zoomTowardScreenPoint(clientX, clientY, factor) {
+      isCabInteriorMode = false;
+      cameraGoalPos = null;
+      targetGoalPos = null;
+
+      if (trackedFlightId && activeAircraftMap.has(trackedFlightId)) {
+        followZoom = THREE.MathUtils.clamp(followZoom * factor, 0.25, 4.0);
+        isFlyingToTrackedAircraft = true;
+        return;
+      }
+
+      const focusPt = getMapPointAtScreen(clientX, clientY);
+      const baseCam = zoomGoalPos ? zoomGoalPos.clone() : camera.position.clone();
+      const baseTarget = zoomGoalTarget ? zoomGoalTarget.clone() : controls.target.clone();
+
+      if (factor < 1.0) {
+        // Zoom in toward the clicked / double-tapped point on the 3D map (never forced onto the tower)
+        const toCam = baseCam.clone().sub(focusPt);
+        const distToFocus = toCam.length();
+        const newDist = Math.max(8.0, distToFocus * factor);
+        const newCamPos = focusPt.clone().add(toCam.normalize().multiplyScalar(newDist));
+        newCamPos.y = Math.max(2.2, newCamPos.y);
+
+        // Shift orbit target onto the map focus point and ensure at least MIN_FREE_ORBIT_DIST ahead
+        const viewDir = focusPt.clone().sub(newCamPos).normalize();
+        const targetDist = Math.max(MIN_FREE_ORBIT_DIST, newCamPos.distanceTo(focusPt));
+        const newTarget = newCamPos.clone().addScaledVector(viewDir, targetDist);
+        newTarget.y = Math.max(GROUND_SURFACE_Y, Math.min(newTarget.y, focusPt.y + 4.0));
+
+        zoomGoalPos = newCamPos;
+        zoomGoalTarget = newTarget;
+      } else {
+        // Zoom out away from current target while relaxing target toward ground map level
+        const offset = baseCam.clone().sub(baseTarget);
+        const curDist = Math.max(8.0, offset.length());
+        const newDist = Math.min(controls.maxDistance, curDist * factor);
+        const relaxedTarget = baseTarget.clone();
+        relaxedTarget.y = THREE.MathUtils.lerp(relaxedTarget.y, 2.0, 0.45);
+        zoomGoalTarget = relaxedTarget;
+        zoomGoalPos = relaxedTarget.clone().add(offset.normalize().multiplyScalar(newDist));
+        zoomGoalPos.y = Math.max(3.0, zoomGoalPos.y);
+      }
+    }
+
     renderer.domElement.addEventListener('pointermove', (e) => {
+      if (activeTouchPointers.has(e.pointerId)) {
+        activeTouchPointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      }
+
+      // Handle 2-finger pinch zoom: steer controls.target toward the pinch midpoint on the 3D map
+      // (Three.js r160 OrbitControls only applies zoomToCursor on mouse wheel, not touch pinch)
+      if (activeTouchPointers.size === 2 && !isCabInteriorMode && !trackedFlightId) {
+        const pts = Array.from(activeTouchPointers.values());
+        const pinchDist = Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y);
+        const midX = (pts[0].x + pts[1].x) * 0.5;
+        const midY = (pts[0].y + pts[1].y) * 0.5;
+        if (!lastPinchFocusPt) {
+          lastPinchFocusPt = getMapPointAtScreen(midX, midY);
+        }
+        if (lastPinchDist !== null) {
+          const deltaPinch = pinchDist - lastPinchDist;
+          if (deltaPinch > 0.4) {
+            // Pinching out (zooming in): steer target toward the 3D map point under the pinch midpoint
+            const steerAmt = THREE.MathUtils.clamp(deltaPinch * 0.0045, 0, 0.16);
+            controls.target.lerp(lastPinchFocusPt, steerAmt);
+          } else if (deltaPinch < -0.4) {
+            // Pinching in (zooming out): lower elevated target to ground map level
+            controls.target.y = THREE.MathUtils.lerp(controls.target.y, 1.6, 0.1);
+          }
+        }
+        lastPinchDist = pinchDist;
+        return;
+      }
+
+      // Handle touch Double-Tap-and-Drag zoom toward the tapped 3D map point
+      if (touchDoubleTapDrag && e.pointerId === touchDoubleTapDrag.pointerId && activeTouchPointers.size === 1) {
+        const totalMove = Math.hypot(e.clientX - touchDoubleTapDrag.startX, e.clientY - touchDoubleTapDrag.startY);
+        if (totalMove > 7) {
+          touchDoubleTapDrag.isDragging = true;
+        }
+        if (touchDoubleTapDrag.isDragging) {
+          const dy = e.clientY - touchDoubleTapDrag.lastY;
+          touchDoubleTapDrag.lastY = e.clientY;
+          // Drag down or up to zoom smoothly toward/away from the tapped point on the 3D map
+          const zoomScale = Math.exp(-dy * 0.0085);
+          const focusPt = touchDoubleTapDrag.focusPoint;
+          const vec = camera.position.clone().sub(focusPt);
+          const curDist = Math.max(4.0, vec.length());
+          const nextDist = THREE.MathUtils.clamp(curDist * zoomScale, 6.0, controls.maxDistance);
+          camera.position.copy(focusPt).add(vec.normalize().multiplyScalar(nextDist));
+          camera.position.y = Math.max(1.8, camera.position.y);
+
+          // Steer controls.target toward the tapped map location and keep it ahead of camera
+          controls.target.lerp(focusPt, 0.18);
+          const dTarget = camera.position.distanceTo(controls.target);
+          if (dTarget < MIN_FREE_ORBIT_DIST) {
+            const fwd = focusPt.clone().sub(camera.position).normalize();
+            if (fwd.lengthSq() > 0.001) {
+              controls.target.copy(camera.position).addScaledVector(fwd, MIN_FREE_ORBIT_DIST);
+            }
+          }
+          controls.target.y = Math.max(GROUND_SURFACE_Y, controls.target.y);
+          return;
+        }
+      }
+
       if (document.body.classList.contains('bg-only') || !window.matchMedia('(hover: hover) and (pointer: fine)').matches) return;
       if (e.pointerType !== 'mouse' && e.pointerType !== 'pen') return;
       const ent = aircraftAtPointer(e);
-      showOnlyAircraftTag(ent ? ent.id : null);
+      showOnlyAircraftTag(ent ? ent.id : pinnedFlightId);
 
       pointer.x = (e.clientX / window.innerWidth) * 2 - 1;
       pointer.y = -(e.clientY / window.innerHeight) * 2 + 1;
@@ -3839,52 +4216,29 @@
     });
 
     renderer.domElement.addEventListener('pointerleave', (e) => {
-      if (e.pointerType === 'mouse' || e.pointerType === 'pen') showOnlyAircraftTag(null);
+      activeTouchPointers.delete(e.pointerId);
+      if (activeTouchPointers.size < 2) {
+        lastPinchDist = null;
+        lastPinchFocusPt = null;
+      }
+      if (touchDoubleTapDrag && e.pointerId === touchDoubleTapDrag.pointerId) {
+        touchDoubleTapDrag = null;
+        controls.enableRotate = true;
+      }
+      if (e.pointerType === 'mouse' || e.pointerType === 'pen') showOnlyAircraftTag(pinnedFlightId);
     });
 
-    // --- DOUBLE-CLICK ZOOM & PASS-THROUGH LOGIC ---
-    const DBL_CLICK_MS = 300;
-    const ZOOM_IN_FACTOR = 0.5;   // halve the distance to the orbit target
-    const ZOOM_OUT_FACTOR = 2.0;  // double the distance to the orbit target
-    let zoomGoalPos = null;       // camera destination for a smooth free-camera zoom
-    let zoomGoalTarget = null;    // target destination when passing through obstacles
-    let followZoom = 1.0;         // distance multiplier while following an aircraft
-    let lastPointerType = 'mouse';
-    let lastRightDown = null;     // { time, x, y } of the previous right-button press
-    let pendingClickTimer = null; // deferred single-click action (cancelled by a double-click)
-
-    function zoomCamera(factor) {
-      cameraGoalPos = null;
-      targetGoalPos = null;
-      if (trackedFlightId && activeAircraftMap.has(trackedFlightId)) {
-        followZoom = THREE.MathUtils.clamp(followZoom * factor, 0.15, 4.0);
-        return;
+    renderer.domElement.addEventListener('pointercancel', (e) => {
+      activeTouchPointers.delete(e.pointerId);
+      if (activeTouchPointers.size < 2) {
+        lastPinchDist = null;
+        lastPinchFocusPt = null;
       }
-      const base = zoomGoalPos || camera.position;
-      const currentTarget = zoomGoalTarget || controls.target;
-      const offset = base.clone().sub(currentTarget);
-      const curDist = offset.length();
-
-      if (factor < 1.0) {
-        // Zoom in: if close to or facing the tower/target, fly right through it!
-        if (curDist <= 6.5) {
-          const fwd = new THREE.Vector3();
-          camera.getWorldDirection(fwd);
-          const passStep = 22.0; // glide forward 22m through the tower/obstacle
-          zoomGoalTarget = currentTarget.clone().addScaledVector(fwd, passStep);
-          zoomGoalPos = base.clone().addScaledVector(fwd, passStep);
-        } else {
-          const dist = Math.max(controls.minDistance, curDist * factor);
-          zoomGoalTarget = currentTarget.clone();
-          zoomGoalPos = currentTarget.clone().add(offset.clone().setLength(dist));
-        }
-      } else {
-        // Zoom out (factor > 1.0, right-click double-click)
-        const dist = Math.min(controls.maxDistance, Math.max(6.0, curDist * factor));
-        zoomGoalTarget = currentTarget.clone();
-        zoomGoalPos = currentTarget.clone().add(offset.clone().setLength(dist));
+      if (touchDoubleTapDrag && e.pointerId === touchDoubleTapDrag.pointerId) {
+        touchDoubleTapDrag = null;
+        controls.enableRotate = true;
       }
-    }
+    });
 
     renderer.domElement.addEventListener('pointerdown', (e) => {
       pointerDownPos.x = e.clientX;
@@ -3894,6 +4248,46 @@
       targetGoalPos = null;
       zoomGoalPos = null;
       zoomGoalTarget = null;
+      isFlyingToTrackedAircraft = false;
+
+      if (e.pointerType === 'touch') {
+        activeTouchPointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+        if (activeTouchPointers.size === 1) {
+          lastPinchDist = null;
+          lastPinchFocusPt = null;
+          const now = performance.now();
+          if (
+            lastSingleTouchTap &&
+            now - lastSingleTouchTap.time <= 360 &&
+            Math.hypot(e.clientX - lastSingleTouchTap.x, e.clientY - lastSingleTouchTap.y) <= 42
+          ) {
+            // Second tap of a double-tap! Prepare for either double-tap zoom or double-tap-and-drag zoom
+            lastSingleTouchTap = null;
+            trackedFlightId = null;
+            const stopBtn = document.getElementById('stop-track-btn');
+            if (stopBtn) stopBtn.classList.add('hidden');
+            touchDoubleTapDrag = {
+              pointerId: e.pointerId,
+              startX: e.clientX,
+              startY: e.clientY,
+              lastY: e.clientY,
+              focusPoint: getMapPointAtScreen(e.clientX, e.clientY),
+              isDragging: false
+            };
+            controls.enableRotate = false;
+          }
+        } else if (activeTouchPointers.size === 2) {
+          // Multi-touch (pinch / two-finger pan): initialize pinch midpoint focus on the 3D map
+          lastSingleTouchTap = null;
+          if (touchDoubleTapDrag) {
+            touchDoubleTapDrag = null;
+            controls.enableRotate = true;
+          }
+          const pts = Array.from(activeTouchPointers.values());
+          lastPinchDist = Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y);
+          lastPinchFocusPt = getMapPointAtScreen((pts[0].x + pts[1].x) * 0.5, (pts[0].y + pts[1].y) * 0.5);
+        }
+      }
 
       // Right-button double-click → zoom out (browsers have no native right dblclick event)
       if (e.pointerType === 'mouse' && e.button === 2 && !document.body.classList.contains('bg-only')) {
@@ -3901,83 +4295,86 @@
         if (lastRightDown && now - lastRightDown.time <= DBL_CLICK_MS
             && Math.hypot(e.clientX - lastRightDown.x, e.clientY - lastRightDown.y) <= 6) {
           lastRightDown = null;
-          zoomCamera(ZOOM_OUT_FACTOR);
+          zoomTowardScreenPoint(e.clientX, e.clientY, ZOOM_OUT_FACTOR);
         } else {
           lastRightDown = { time: now, x: e.clientX, y: e.clientY };
         }
       }
     });
 
-    // Left-button double-click → zoom in (mouse only; touch keeps its double-tap aircraft info)
+    // Left-button double-click → zoom in toward clicked point on the 3D map
     renderer.domElement.addEventListener('dblclick', (e) => {
       if (document.body.classList.contains('bg-only') || lastPointerType === 'touch') return;
       if (e.button !== 0) return;
       clearTimeout(pendingClickTimer);
       pendingClickTimer = null;
-      zoomCamera(ZOOM_IN_FACTOR);
+      zoomTowardScreenPoint(e.clientX, e.clientY, ZOOM_IN_FACTOR);
     });
 
-    // Mouse wheel / trackpad scroll zoom with seamless tower pass-through
+    // Mouse wheel / trackpad scroll zoom with automatic target advancement so camera never gets stuck
     renderer.domElement.addEventListener('wheel', (e) => {
       if (document.body.classList.contains('bg-only')) return;
+      isCabInteriorMode = false;
       cameraGoalPos = null;
       targetGoalPos = null;
       zoomGoalPos = null;
       zoomGoalTarget = null;
+      isFlyingToTrackedAircraft = false;
+
+      if (trackedFlightId && activeAircraftMap.has(trackedFlightId)) {
+        const factor = e.deltaY < 0 ? 0.88 : 1.14;
+        followZoom = THREE.MathUtils.clamp(followZoom * factor, 0.25, 4.0);
+        return;
+      }
+
+      // Steer target toward the cursor's ground point on the 3D map so wheel zoom never locks onto the control tower
+      if (e.deltaY < 0) {
+        const cursorGroundPt = getMapPointAtScreen(e.clientX, e.clientY);
+        controls.target.lerp(cursorGroundPt, 0.12);
+      } else if (e.deltaY > 0 && controls.target.y > 2.5) {
+        controls.target.y = THREE.MathUtils.lerp(controls.target.y, 1.6, 0.12);
+      }
 
       const curDist = camera.position.distanceTo(controls.target);
-      if (e.deltaY < 0) {
-        // Zooming in: when close to target or hitting tower obstacle, pass right through!
-        if (curDist <= 4.8) {
-          const fwd = new THREE.Vector3();
-          camera.getWorldDirection(fwd);
-          const step = Math.min(3.8, Math.max(0.35, Math.abs(e.deltaY) * 0.016));
-          camera.position.addScaledVector(fwd, step);
-          controls.target.addScaledVector(fwd, step);
-        }
-      } else if (e.deltaY > 0) {
-        // Zooming out: if close inside geometry, step back cleanly
-        if (curDist < 2.5) {
-          const fwd = new THREE.Vector3();
-          camera.getWorldDirection(fwd);
-          const step = Math.min(2.5, Math.max(0.35, Math.abs(e.deltaY) * 0.014));
-          camera.position.addScaledVector(fwd, -step);
-        }
+      if (e.deltaY < 0 && curDist <= MIN_FREE_ORBIT_DIST + 4.0) {
+        // Advance both camera and target toward the cursor ray so zooming in never gets stuck against the tower
+        pointer.x = (e.clientX / window.innerWidth) * 2 - 1;
+        pointer.y = -(e.clientY / window.innerHeight) * 2 + 1;
+        raycaster.setFromCamera(pointer, camera);
+        const step = Math.min(8.0, Math.max(1.2, Math.abs(e.deltaY) * 0.03));
+        camera.position.addScaledVector(raycaster.ray.direction, step);
+        controls.target.copy(camera.position).addScaledVector(raycaster.ray.direction, MIN_FREE_ORBIT_DIST);
       }
     }, { passive: true });
 
     renderer.domElement.addEventListener('pointerup', (e) => {
+      activeTouchPointers.delete(e.pointerId);
+      if (activeTouchPointers.size < 2) {
+        lastPinchDist = null;
+        lastPinchFocusPt = null;
+      }
+
+      if (touchDoubleTapDrag && e.pointerId === touchDoubleTapDrag.pointerId) {
+        const wasDragging = touchDoubleTapDrag.isDragging;
+        touchDoubleTapDrag = null;
+        controls.enableRotate = true;
+        if (!wasDragging && !document.body.classList.contains('bg-only')) {
+          // Quick double-tap release: zoom smoothly toward the tapped 3D map point
+          zoomTowardScreenPoint(e.clientX, e.clientY, ZOOM_IN_FACTOR);
+        }
+        return;
+      }
+
       if (document.body.classList.contains('bg-only')) return;
-      // Only the left mouse button (or touch/pen) selects buildings & aircraft
       if (e.pointerType === 'mouse' && e.button !== 0) return;
       const dist = Math.hypot(e.clientX - pointerDownPos.x, e.clientY - pointerDownPos.y);
-      if (dist > 6) return;
+      if (dist > 8) return;
 
       const aircraft = aircraftAtPointer(e);
       if (aircraft) {
         if (e.pointerType === 'touch') {
-          const now = performance.now();
-          const previousTap = lastTouchAircraftTap;
-          const isDoubleTap = previousTap
-            && previousTap.id === aircraft.id
-            && now - previousTap.time <= 450
-            && Math.hypot(e.clientX - previousTap.x, e.clientY - previousTap.y) <= 36;
-
-          if (!isDoubleTap) {
-            lastTouchAircraftTap = { id: aircraft.id, time: now, x: e.clientX, y: e.clientY };
-            return;
-          }
-
-          lastTouchAircraftTap = null;
-          pinnedFlightId = pinnedFlightId === aircraft.id ? null : aircraft.id;
-          showOnlyAircraftTag(pinnedFlightId);
-          if (pinnedFlightId) {
-            focusOnFlight(aircraft.data);
-          } else {
-            const card = document.getElementById('info-card');
-            card.classList.add('translate-x-full', 'opacity-0', 'pointer-events-none');
-            card.classList.remove('translate-x-0', 'opacity-100', 'pointer-events-auto');
-          }
+          lastSingleTouchTap = null;
+          focusOnFlight(aircraft.data);
           return;
         }
 
@@ -3990,7 +4387,9 @@
         return;
       }
 
-      if (e.pointerType === 'touch') lastTouchAircraftTap = null;
+      if (e.pointerType === 'touch') {
+        lastSingleTouchTap = { time: performance.now(), x: e.clientX, y: e.clientY };
+      }
 
       pointer.x = (e.clientX / window.innerWidth) * 2 - 1;
       pointer.y = -(e.clientY / window.innerHeight) * 2 + 1;
@@ -4007,17 +4406,19 @@
           action = () => selectBay(hitObj.userData.bayData);
         }
         const key = hitObj.userData.landmarkKey;
-        if (!action && key) action = () => selectLandmark(key);
+        if (!action && key) {
+          // Only trigger landmark jump on explicit mouse click or if not double-tapping to zoom on touch
+          action = () => selectLandmark(key);
+        }
         if (!action) return;
 
         if (e.pointerType === 'mouse') {
-          // Defer so a double-click zooms instead of flying to the landmark
           clearTimeout(pendingClickTimer);
           pendingClickTimer = setTimeout(() => {
             pendingClickTimer = null;
             action();
           }, DBL_CLICK_MS);
-        } else {
+        } else if (hitObj.userData.flightId || hitObj.userData.bayData) {
           action();
         }
       }
@@ -4043,6 +4444,9 @@
     });
     document.getElementById('stop-track-btn').addEventListener('click', () => {
       trackedFlightId = null;
+      pinnedFlightId = null;
+      isFlyingToTrackedAircraft = false;
+      showOnlyAircraftTag(null);
       document.getElementById('stop-track-btn').classList.add('hidden');
       selectLandmark('hero');
     });
@@ -4092,11 +4496,32 @@
       const beaconPulse = (Math.sin(elapsed * 4.5) + 1) * 0.5;
       beaconMat.color.setRGB(1.0, beaconPulse * 0.2, beaconPulse * 0.2);
 
-      // 3. Animate Real-Time RCTP Aircraft Fleet (Takeoff, Landing, Taxi, Gates & Live ADS-B Airspace)
-      const dirSign = activeRunwayDir === '05' ? 1 : -1; // +1 = RWY 05 (+X, 048°), -1 = RWY 23 (-X, 228°)
-      const rwyYaw = dirSign === 1 ? 0 : Math.PI;
+      // 2. Update Continuous Simulated Flights at 60 FPS (prevents any snap-back on poll intervals)
+      if (!isRealLiveNetworkActive) {
+        const simStates = getDynamicRctpFlights(performance.now() * 0.001);
+        for (const simF of simStates) {
+          const ent = activeAircraftMap.get(simF.id);
+          if (ent) {
+            const wasAirborne = !ent.data.onGround;
+            Object.assign(ent.data, simF);
+            ent.targetPos.set(simF.pos.x, simF.pos.y, simF.pos.z);
+            if (ent.lastCycleIndex !== simF.cycleIndex) {
+              // Cycle wrapped at far boundary: teleport immediately without backward lerp
+              ent.group.position.copy(ent.targetPos);
+              ent.lastCycleIndex = simF.cycleIndex;
+            } else {
+              ent.group.position.copy(ent.targetPos);
+            }
+            // Spawn touchdown tire smoke when arrival flight transitions from airborne to ground
+            if (wasAirborne && simF.onGround && simF.id === 'live_arr' && elapsed - ent.lastSmokeTime > 5.0) {
+              ent.lastSmokeTime = elapsed;
+              spawnTouchdownSmoke(simF.pos.x, simF.pos.z);
+            }
+          }
+        }
+      }
 
-      // Double-flash white strobe & red anti-collision beacon timing
+      // 3. Animate Real-Time RCTP Aircraft Fleet (Takeoff, Landing, Taxi, Gates & Live ADS-B Airspace)
       const strobePhase = elapsed % 1.25;
       const isStrobeOn = (strobePhase < 0.07) || (strobePhase > 0.14 && strobePhase < 0.21);
       const isAntiColOn = (elapsed % 1.1) < 0.12;
@@ -4112,18 +4537,22 @@
           for (const r of u.propRotors) r.rotation.x += dt * 42.0;
         }
 
-        // Real-Time GPS / ADS-B Positioned Aircraft around RCTP with 60 FPS dead-reckoning
         const relRad = (((data.heading || 48) - RCTP_REF.rwyHeadingDeg) * Math.PI) / 180.0;
         const yaw = -relRad;
-        const pitch = data.onGround ? 0 : Math.max(-0.14, Math.min(0.20, (data.vrate || 0) / 14000));
+        const pitch = typeof data.pitch === 'number'
+          ? data.pitch
+          : (data.onGround ? 0 : Math.max(-0.14, Math.min(0.20, (data.vrate || 0) / 14000)));
         const bank = data.onGround ? 0 : Math.max(-0.38, Math.min(0.38, ((data.roll || 0) * Math.PI) / 180.0));
 
-        if (ent.targetPos) {
-          // Advance dead-reckoning target along true heading at scaled groundspeed
+        // Only run dead-reckoning interpolation for external live ADS-B network flights
+        if (!data.isSimulated && ent.targetPos) {
           const speedSceneUnits = ((data.gs || 0) * 0.51444) * (250 / 2000) * 0.55;
           ent.targetPos.x += Math.cos(relRad) * speedSceneUnits * dt;
           ent.targetPos.z += Math.sin(relRad) * speedSceneUnits * dt;
-          group.position.lerp(ent.targetPos, 0.06);
+          if (!data.onGround && data.vrate) {
+            ent.targetPos.y = THREE.MathUtils.clamp(ent.targetPos.y + (data.vrate / 6000) * dt, GROUND_SURFACE_Y, 145);
+          }
+          group.position.lerp(ent.targetPos, 0.08);
         }
 
         plane.rotation.set(bank, yaw, pitch);
@@ -4151,50 +4580,113 @@
         }
       }
 
-      // 5. Camera Follow Mode when tracking a live RCTP aircraft
+      // 5. Camera Follow Mode when tracking an aircraft (unobstructed view + free user orbit)
       if (trackedFlightId && activeAircraftMap.has(trackedFlightId)) {
         const trackedEnt = activeAircraftMap.get(trackedFlightId);
         const pPos = trackedEnt.group.position;
-        const desiredTarget = new THREE.Vector3(pPos.x, pPos.y + 2.2, pPos.z);
-        const desiredCam = new THREE.Vector3(
-          pPos.x - 26 * followZoom,
-          Math.max(6.5, pPos.y + 11.5 * followZoom),
-          pPos.z + 32 * followZoom
-        );
-        camera.position.lerp(desiredCam, 0.06);
-        controls.target.lerp(desiredTarget, 0.08);
-      } else if (zoomGoalPos) {
-        // Smooth double-click zoom toward / away from the orbit target (or through obstacles)
-        camera.position.lerp(zoomGoalPos, 0.18);
-        if (zoomGoalTarget) {
-          controls.target.lerp(zoomGoalTarget, 0.18);
+        if (!trackedPrevPos) trackedPrevPos = pPos.clone();
+        const moveDelta = pPos.clone().sub(trackedPrevPos);
+        // Handle large cycle wrap teleport cleanly
+        if (moveDelta.lengthSq() > 4000) {
+          isFlyingToTrackedAircraft = true;
+        } else {
+          camera.position.add(moveDelta);
+          controls.target.add(moveDelta);
         }
-        if (camera.position.distanceTo(zoomGoalPos) < 0.08) {
+        trackedPrevPos.copy(pPos);
+
+        if (isFlyingToTrackedAircraft) {
+          const { camPos: desiredCam, targetPos: desiredTarget } = computeUnobstructedAircraftView(pPos, trackedEnt.data, followZoom);
+          camera.position.lerp(desiredCam, 0.085);
+          controls.target.lerp(desiredTarget, 0.11);
+          if (camera.position.distanceTo(desiredCam) < 0.75) {
+            isFlyingToTrackedAircraft = false;
+          }
+        } else {
+          // Keep target anchored near the aircraft unless the user pans away across the map
+          const aircraftCenter = new THREE.Vector3(pPos.x, pPos.y + 2.4, pPos.z);
+          if (controls.target.distanceTo(aircraftCenter) > 48) {
+            trackedFlightId = null;
+            const stopBtn = document.getElementById('stop-track-btn');
+            if (stopBtn) stopBtn.classList.add('hidden');
+          } else {
+            controls.target.lerp(aircraftCenter, 0.08);
+          }
+        }
+      } else if (zoomGoalPos) {
+        camera.position.lerp(zoomGoalPos, 0.16);
+        if (zoomGoalTarget) {
+          controls.target.lerp(zoomGoalTarget, 0.16);
+        }
+        if (camera.position.distanceTo(zoomGoalPos) < 0.12) {
           zoomGoalPos = null;
           zoomGoalTarget = null;
         }
       } else if (cameraGoalPos && targetGoalPos) {
-        // 6. Smooth Camera Fly-To Interpolation
-        camera.position.lerp(cameraGoalPos, 0.065);
-        controls.target.lerp(targetGoalPos, 0.065);
+        camera.position.lerp(cameraGoalPos, 0.075);
+        controls.target.lerp(targetGoalPos, 0.075);
         if (camera.position.distanceTo(cameraGoalPos) < 0.35) {
           cameraGoalPos = null;
           targetGoalPos = null;
         }
+      } else if (!isCabInteriorMode && !touchDoubleTapDrag) {
+        // Free 3D map navigation: prevent camera from ever getting stuck at controls.target (e.g. the tower)
+        // and keep orbitDist >= MIN_FREE_ORBIT_DIST so pinch-zoom and two-finger pan stay fast & unrestricted
+        const offsetToTarget = controls.target.clone().sub(camera.position);
+        const curOrbitDist = offsetToTarget.length();
+        if (curOrbitDist < MIN_FREE_ORBIT_DIST && curOrbitDist > 0.001) {
+          const fwd = offsetToTarget.normalize();
+          controls.target.copy(camera.position).addScaledVector(fwd, MIN_FREE_ORBIT_DIST);
+        }
+        // When looking downward at the 3D airport map from above, gently bring elevated target down toward apron level
+        if (camera.position.y > controls.target.y + 8.0 && controls.target.y > 4.0 && activeTouchPointers.size > 0) {
+          controls.target.y = THREE.MathUtils.lerp(controls.target.y, 1.8, 0.08);
+        }
       }
+
+      // Clamp map target bounds generously so the user can explore the entire 3D airport freely
+      controls.target.x = THREE.MathUtils.clamp(controls.target.x, -560, 560);
+      controls.target.z = THREE.MathUtils.clamp(controls.target.z, -440, 440);
 
       // Smooth continuous viewing angles in all directions without hitting artificial polar walls
       const orbitDist = Math.max(camera.position.distanceTo(controls.target), 0.1);
-      const minY = 0.45;
+      const minY = 0.65;
       const cosLimit = THREE.MathUtils.clamp((minY - controls.target.y) / orbitDist, -0.998, 0.998);
       controls.maxPolarAngle = Math.acos(cosLimit);
       controls.minPolarAngle = 0.01;
 
       controls.update();
 
-      // Ensure camera never penetrates below the terrain
-      if (camera.position.y < 0.45) camera.position.y = 0.45;
-      if (controls.target.y < 0.1) controls.target.y = 0.1;
+      // Ensure camera never penetrates below the terrain or gets stuck inside the control tower shaft
+      if (camera.position.y < 0.65) camera.position.y = 0.65;
+      if (controls.target.y < GROUND_SURFACE_Y) controls.target.y = GROUND_SURFACE_Y;
+      if (!isCabInteriorMode && !cameraGoalPos && camera.position.y < 68.0) {
+        const towerDx = camera.position.x - (-0.45);
+        const towerDz = camera.position.z;
+        const towerDist = Math.hypot(towerDx, towerDz);
+        const minTowerClearance = 12.5;
+        if (towerDist < minTowerClearance) {
+          const nx = towerDist > 0.001 ? towerDx / towerDist : 0;
+          const nz = towerDist > 0.001 ? towerDz / towerDist : 1;
+          const pushOut = minTowerClearance - towerDist;
+          camera.position.x += nx * pushOut;
+          camera.position.z += nz * pushOut;
+          controls.target.x += nx * pushOut;
+          controls.target.z += nz * pushOut;
+        }
+      }
+
+      // Dynamically scale camera near plane with altitude/distance to maximize 24-bit depth buffer precision and eliminate far-view flickering
+      const camDist = camera.position.distanceTo(controls.target);
+      const desiredNear = THREE.MathUtils.clamp(
+        Math.min(camDist * 0.03, Math.max(0.25, (camera.position.y - 68) * 0.25)),
+        0.25,
+        18.0
+      );
+      if (Math.abs(camera.near - desiredNear) > 0.05) {
+        camera.near = desiredNear;
+        camera.updateProjectionMatrix();
+      }
 
       renderer.render(scene, camera);
     }
