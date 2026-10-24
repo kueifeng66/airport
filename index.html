@@ -1892,7 +1892,10 @@
       const isNorthSide = bay.pos.z < 0;
       const isContactGate = ['D', 'A', 'C', 'B'].includes(bay.id[0]);
 
+      const isNeCargo = bay.pos.z < -60 && bay.pos.x > 140;
+
       // 1. Painted Stand Number Plate on tarmac
+      const markerOffsetZ = isNeCargo ? -4.2 : (isNorthSide ? -7.2 : 7.2);
       const markerMat = new THREE.MeshBasicMaterial({
         map: getStandTexture(bay.id),
         transparent: true,
@@ -1903,7 +1906,7 @@
       });
       const markerMesh = new THREE.Mesh(standMarkerGeo, markerMat);
       markerMesh.rotation.x = -Math.PI / 2;
-      markerMesh.position.set(bay.pos.x, 0.18, bay.pos.z + (isNorthSide ? -7.2 : 7.2));
+      markerMesh.position.set(bay.pos.x, 0.18, bay.pos.z + markerOffsetZ);
       markerMesh.userData.bayData = bay;
       terminalGroup.add(markerMesh);
       interactiveMeshes.push(markerMesh);
@@ -1946,7 +1949,10 @@
         interactiveMeshes.push(rotunda);
 
         // Stand Number ID Signboard mounted facing the taxi lane
-        const signMat = new THREE.MeshBasicMaterial({ map: getStandTexture(bay.id) });
+        const signMat = new THREE.MeshBasicMaterial({ 
+          map: getStandTexture(bay.id),
+          side: THREE.DoubleSide
+        });
         const signMesh = new THREE.Mesh(new THREE.PlaneGeometry(2.4, 1.2), signMat);
         signMesh.position.set(bay.pos.x, 5.8, rotundaZ + (isNorthSide ? -1.65 : 1.65));
         if (!isNorthSide) signMesh.rotation.y = Math.PI;
@@ -1955,14 +1961,19 @@
         interactiveMeshes.push(signMesh);
       } else {
         // Remote & Cargo Stands: Illuminated Stand Post
+        const postZ = isNeCargo ? (bay.pos.z - 4.8) : bay.pos.z + (isNorthSide ? -5.5 : 5.5);
         const post = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.12, 3.2, 8), darkFrameMat);
-        post.position.set(bay.pos.x + 3.8, 1.6, bay.pos.z + (isNorthSide ? -5.5 : 5.5));
+        post.position.set(bay.pos.x + 3.8, 1.6, postZ);
         terminalGroup.add(post);
 
-        const signMat = new THREE.MeshBasicMaterial({ map: getStandTexture(bay.id) });
+        const signMat = new THREE.MeshBasicMaterial({ 
+          map: getStandTexture(bay.id),
+          side: THREE.DoubleSide
+        });
         const signMesh = new THREE.Mesh(new THREE.PlaneGeometry(2.2, 1.1), signMat);
-        signMesh.position.set(bay.pos.x + 3.8, 3.2, bay.pos.z + (isNorthSide ? -5.5 : 5.5));
-        if (isNorthSide) signMesh.rotation.y = Math.PI;
+        signMesh.position.set(bay.pos.x + 3.8, 3.2, postZ);
+        // NE Cargo stands face South (+Z) towards the apron and viewer
+        if (isNorthSide && !isNeCargo) signMesh.rotation.y = Math.PI;
         signMesh.userData.bayData = bay;
         terminalGroup.add(signMesh);
         interactiveMeshes.push(signMesh);
