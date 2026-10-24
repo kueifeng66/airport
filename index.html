@@ -260,6 +260,17 @@
     </div>
   </aside>
 
+  <!-- Floating 2D/3D Mode & Compass Control for iPhone & Touch Devices -->
+  <div id="floating-map-controls" class="fixed bottom-20 right-4 z-20 flex flex-col items-end gap-2 pointer-events-auto select-none" style="-webkit-user-select: none; user-select: none;">
+    <button id="btn-toggle-2d3d" class="glass-panel px-3 py-2 rounded-2xl border border-sky-400/40 text-sky-200 hover:text-white hover:bg-slate-800/90 transition-all shadow-xl flex items-center gap-1.5 text-xs font-bold mono select-none cursor-pointer" title="Toggle 2D Top-Down / 3D Perspective">
+      <span id="label-2d3d-icon">📐</span>
+      <span id="label-2d3d-text">2D VIEW</span>
+    </button>
+    <button id="btn-compass-north" class="glass-panel w-9 h-9 rounded-2xl border border-slate-700/60 text-slate-300 hover:text-white hover:bg-slate-800/90 transition-all shadow-xl flex items-center justify-center font-bold text-xs mono select-none cursor-pointer" title="Realign North (Runways Horizontal)">
+      <span id="compass-needle" class="inline-block transition-transform duration-75 text-rose-400 text-sm font-black">▲</span>
+    </button>
+  </div>
+
   <!-- Bottom Quick-Select Camera & Landmark Bar -->
   <footer class="fixed bottom-4 left-4 right-4 z-10 flex flex-wrap items-center justify-between gap-3 pointer-events-none">
     <div class="glass-panel rounded-2xl p-2 pointer-events-auto flex items-center gap-1.5 overflow-x-auto max-w-full">
@@ -284,9 +295,15 @@
             <span class="text-slate-200">Live TPE & Controls</span>
             <input type="checkbox" id="chk-livetpe-bar" checked class="accent-sky-400 rounded cursor-pointer">
           </label>
-          <div class="border-t border-slate-700/60 mt-2 pt-2 flex items-center justify-between gap-1 text-[10px]">
-            <button id="btn-show-both-top" class="px-2 py-1 rounded bg-sky-500/20 text-sky-300 hover:bg-sky-500/30 cursor-pointer">Show All</button>
-            <button id="btn-hide-both-top" class="px-2 py-1 rounded bg-slate-800 text-slate-300 hover:bg-slate-700 cursor-pointer">Hide All</button>
+          <div class="border-t border-slate-700/60 mt-2 pt-2 flex flex-col gap-1.5 text-[10px]">
+            <button id="btn-quick-topdown" class="w-full px-2 py-1.5 rounded bg-sky-500/20 text-sky-200 hover:bg-sky-500/30 flex items-center justify-between cursor-pointer">
+              <span>📐 Top-Down (2D Nadir)</span>
+              <span class="text-[9px] text-sky-400">90°</span>
+            </button>
+            <div class="flex items-center justify-between gap-1 pt-0.5">
+              <button id="btn-show-both-top" class="px-2 py-1 rounded bg-slate-800 text-sky-300 hover:bg-slate-700 cursor-pointer">Show All</button>
+              <button id="btn-hide-both-top" class="px-2 py-1 rounded bg-slate-800 text-slate-300 hover:bg-slate-700 cursor-pointer">Hide All</button>
+            </div>
           </div>
         </div>
       </div>
@@ -313,6 +330,9 @@
       </button>
       <button data-target="aerial" class="landmark-btn px-3 py-1.5 rounded-xl text-xs font-semibold text-slate-200 hover:bg-slate-800/70 transition whitespace-nowrap">
         🗺️ 77-Bay Masterplan
+      </button>
+      <button data-target="topDown" class="landmark-btn px-3 py-1.5 rounded-xl text-xs font-semibold text-slate-200 hover:bg-slate-800/70 transition whitespace-nowrap" title="Switch to 90° Top-Down 2D View">
+        📐 Top-Down (2D)
       </button>
       <button data-target="cabInterior" class="landmark-btn px-3 py-1.5 rounded-xl text-xs font-semibold text-slate-200 hover:bg-slate-800/70 transition whitespace-nowrap">
         👁️ 10F Cab View
@@ -391,6 +411,14 @@
         camPos: new THREE.Vector3(-15, 145, 175),
         lookAt: new THREE.Vector3(0, 10, -5)
       },
+      topDown: {
+        badge: 'Top-Down Layout • 2D Nadir View',
+        title: 'RCTP 2D Top-Down Runway & Stand Masterplan',
+        desc: 'Direct 90° nadir top-down overview of Taiwan Taoyuan International Airport (RCTP): parallel runways 05L/23R and 05R/23L aligned horizontally with full aerial view of Terminal 1, Terminal 2, Remote Apron, and Cargo Logistics Zone.',
+        stats: ['90° Nadir View', 'Runway 05L/23R', 'Runway 05R/23L', '77 Active Stands'],
+        camPos: new THREE.Vector3(0, 280, 0.5),
+        lookAt: new THREE.Vector3(0, 0, 0)
+      },
       cabInterior: {
         badge: '10th Floor Operations • YouTube 2:15 & 3:12',
         title: '360° Control Cab & TAS Workstations',
@@ -447,7 +475,7 @@
     };
     controls.minDistance = 0.2;
     controls.maxDistance = 1400;
-    controls.minPolarAngle = 0.01;
+    controls.minPolarAngle = 0.001;
     controls.maxPolarAngle = Math.PI - 0.02;
     controls.target.copy(initPreset.lookAt);
 
@@ -4143,6 +4171,7 @@
     let lastPinchMid = null;
     let pinchRotAccum = 0;
     let isPinchRotating = false;
+    let isPitchTilting = false;
     let lastSingleTouchTap = null; // { time, x, y }
     let touchDoubleTapDrag = null; // { pointerId, startX, startY, lastY, focusPoint, isDragging }
 
@@ -4231,7 +4260,7 @@
 
           // 1. PINCH GESTURE TO ROTATE (Two-finger twist):
           // Detect intentional rotation gesture (cumulative angle change >= 2.5°)
-          if (!isPinchRotating && Math.abs(pinchRotAccum) > 0.045 && Math.abs(deltaAngle) > 0.008) {
+          if (!isPinchRotating && !isPitchTilting && Math.abs(pinchRotAccum) > 0.045 && Math.abs(deltaAngle) > 0.008) {
             isPinchRotating = true;
           }
 
@@ -4243,9 +4272,28 @@
             camera.position.copy(controls.target).add(offset);
           }
 
-          // 2. PINCH TO ZOOM IN OR ZOOM OUT (WITHOUT ROTATING):
+          // 2. TWO-FINGER VERTICAL SWIPE TO TILT PITCH (Between 3D angled and 90° Top-Down view):
+          // Standard Apple Maps / Google Maps gesture:
+          // Swipe fingers DOWN -> tilts camera pitch towards Top-Down 2D nadir view (phi -> 0.003 rad)
+          // Swipe fingers UP -> tilts camera pitch towards 3D angled perspective (phi -> ~0.9 rad)
+          const isVerticalSwipe = Math.abs(deltaMidY) > 2.0 && Math.abs(deltaMidY) > Math.abs(deltaMidX) * 1.35 && Math.abs(deltaDist) < 10.0 && !isPinchRotating;
+          if (isVerticalSwipe || isPitchTilting) {
+            isPitchTilting = true;
+            const offset = camera.position.clone().sub(controls.target);
+            const spherical = new THREE.Spherical().setFromVector3(offset);
+            const tiltDelta = (deltaMidY / window.innerHeight) * 2.6;
+            spherical.phi = THREE.MathUtils.clamp(spherical.phi - tiltDelta, 0.003, Math.PI * 0.48);
+            if (spherical.phi < 0.06 && !isPinchRotating) {
+              spherical.theta = THREE.MathUtils.lerp(spherical.theta, 0, 0.14);
+            }
+            offset.setFromSpherical(spherical);
+            camera.position.copy(controls.target).add(offset);
+            camera.position.y = Math.max(1.8, camera.position.y);
+          }
+
+          // 3. PINCH TO ZOOM IN OR ZOOM OUT (WITHOUT ROTATING):
           // Scale distance strictly along the current view direction vector
-          if (Math.abs(deltaDist) > 0.6) {
+          if (Math.abs(deltaDist) > 0.6 && !isPitchTilting) {
             const zoomRatio = curDist / lastPinchDist;
             const offset = camera.position.clone().sub(controls.target);
             const curOrbitDist = Math.max(offset.length(), 0.001);
@@ -4266,8 +4314,8 @@
             camera.position.copy(newCam);
           }
 
-          // 3. TWO-FINGER PAN (Translating midpoint across the ground):
-          if (midMoveDist > 1.2 && !isPinchRotating) {
+          // 4. TWO-FINGER PAN (Translating midpoint across the ground):
+          if (midMoveDist > 1.2 && !isPinchRotating && !isPitchTilting) {
             const viewOffset = camera.position.clone().sub(controls.target);
             const viewDist = viewOffset.length();
             const viewDir = viewOffset.clone().normalize();
@@ -4352,6 +4400,7 @@
         lastPinchMid = null;
         pinchRotAccum = 0;
         isPinchRotating = false;
+        isPitchTilting = false;
         controls.enabled = true;
       }
       if (touchDoubleTapDrag && e.pointerId === touchDoubleTapDrag.pointerId) {
@@ -4369,6 +4418,7 @@
         lastPinchMid = null;
         pinchRotAccum = 0;
         isPinchRotating = false;
+        isPitchTilting = false;
         controls.enabled = true;
       }
       if (touchDoubleTapDrag && e.pointerId === touchDoubleTapDrag.pointerId) {
@@ -4428,6 +4478,7 @@
           lastPinchMid = null;
           pinchRotAccum = 0;
           isPinchRotating = false;
+          isPitchTilting = false;
           const now = performance.now();
           if (
             lastSingleTouchTap &&
@@ -4462,6 +4513,7 @@
           lastPinchMid = { x: (pts[0].x + pts[1].x) * 0.5, y: (pts[0].y + pts[1].y) * 0.5 };
           pinchRotAccum = 0;
           isPinchRotating = false;
+          isPitchTilting = false;
         }
       }
 
@@ -4566,6 +4618,7 @@
         lastPinchMid = null;
         pinchRotAccum = 0;
         isPinchRotating = false;
+        isPitchTilting = false;
         controls.enabled = true;
       }
 
@@ -4844,6 +4897,99 @@
       selectLandmark('hero');
     });
 
+    // --- 2D TOP-DOWN / 3D PERSPECTIVE TOGGLE & COMPASS LOGIC ---
+    function toggle2D3DView() {
+      isCabInteriorMode = false;
+      trackedFlightId = null;
+      isFlyingToTrackedAircraft = false;
+      const stopBtn = document.getElementById('stop-track-btn');
+      if (stopBtn) stopBtn.classList.add('hidden');
+
+      const offset = camera.position.clone().sub(controls.target);
+      const curDist = Math.max(offset.length(), 10.0);
+      const spherical = new THREE.Spherical().setFromVector3(offset);
+
+      // Check if camera is currently in Top-Down view (phi < 0.22 rad, ~12.5 deg)
+      const isCurrentlyTopDown = spherical.phi < 0.22;
+
+      if (isCurrentlyTopDown) {
+        // Switch to 3D Perspective View (angled ~48° tilt)
+        spherical.phi = 0.85;
+        if (Math.abs(spherical.theta) < 0.05) spherical.theta = 0.25;
+        const newOffset = new THREE.Vector3().setFromSpherical(spherical);
+        cameraGoalPos = controls.target.clone().add(newOffset);
+        cameraGoalPos.y = Math.max(12.0, cameraGoalPos.y);
+        targetGoalPos = controls.target.clone();
+      } else {
+        // Switch to 2D Top-Down Nadir View (90° overhead, runways horizontal)
+        spherical.phi = 0.002;
+        spherical.theta = 0.0; // Runway 05L/05R horizontal, North at bottom
+        spherical.radius = THREE.MathUtils.clamp(curDist, 40.0, 360.0);
+        const newOffset = new THREE.Vector3().setFromSpherical(spherical);
+        cameraGoalPos = controls.target.clone().add(newOffset);
+        targetGoalPos = controls.target.clone();
+        targetGoalPos.y = GROUND_SURFACE_Y;
+      }
+      zoomGoalPos = null;
+      zoomGoalTarget = null;
+    }
+
+    function resetNorth() {
+      const offset = camera.position.clone().sub(controls.target);
+      const spherical = new THREE.Spherical().setFromVector3(offset);
+      spherical.theta = 0.0; // Realign North / runways horizontal
+      const newOffset = new THREE.Vector3().setFromSpherical(spherical);
+      cameraGoalPos = controls.target.clone().add(newOffset);
+      targetGoalPos = controls.target.clone();
+      zoomGoalPos = null;
+      zoomGoalTarget = null;
+    }
+
+    function update2D3DUI() {
+      const offset = camera.position.clone().sub(controls.target);
+      const spherical = new THREE.Spherical().setFromVector3(offset);
+      const isTopDown = spherical.phi < 0.22;
+
+      const btn2d = document.getElementById('btn-toggle-2d3d');
+      const btn2dIcon = document.getElementById('label-2d3d-icon');
+      const btn2dText = document.getElementById('label-2d3d-text');
+      if (btn2d && btn2dIcon && btn2dText) {
+        if (isTopDown) {
+          btn2dIcon.textContent = '🌐';
+          btn2dText.textContent = '3D VIEW';
+          btn2d.className = 'glass-panel px-3 py-2 rounded-2xl border border-emerald-400/50 bg-emerald-500/20 text-emerald-200 hover:text-white transition-all shadow-xl flex items-center gap-1.5 text-xs font-bold mono select-none cursor-pointer';
+        } else {
+          btn2dIcon.textContent = '📐';
+          btn2dText.textContent = '2D VIEW';
+          btn2d.className = 'glass-panel px-3 py-2 rounded-2xl border border-sky-400/40 text-sky-200 hover:text-white hover:bg-slate-800/90 transition-all shadow-xl flex items-center gap-1.5 text-xs font-bold mono select-none cursor-pointer';
+        }
+      }
+
+      const needle = document.getElementById('compass-needle');
+      if (needle) {
+        const fwd = new THREE.Vector3();
+        camera.getWorldDirection(fwd);
+        const angleRad = Math.atan2(fwd.x, -fwd.z);
+        const deg = angleRad * (180 / Math.PI);
+        needle.style.transform = `rotate(${-deg}deg)`;
+      }
+    }
+
+    const btnToggle2D3D = document.getElementById('btn-toggle-2d3d');
+    if (btnToggle2D3D) btnToggle2D3D.addEventListener('click', toggle2D3DView);
+
+    const btnCompassNorth = document.getElementById('btn-compass-north');
+    if (btnCompassNorth) btnCompassNorth.addEventListener('click', resetNorth);
+
+    const btnQuickTopDown = document.getElementById('btn-quick-topdown');
+    if (btnQuickTopDown) {
+      btnQuickTopDown.addEventListener('click', () => {
+        selectLandmark('topDown');
+        const viewsDropdownMenu = document.getElementById('views-dropdown-menu');
+        if (viewsDropdownMenu) viewsDropdownMenu.classList.add('hidden');
+      });
+    }
+
     window.addEventListener('resize', () => {
       camera.aspect = window.innerWidth / window.innerHeight;
       camera.updateProjectionMatrix();
@@ -5028,9 +5174,10 @@
       const minY = 0.65;
       const cosLimit = THREE.MathUtils.clamp((minY - controls.target.y) / orbitDist, -0.998, 0.998);
       controls.maxPolarAngle = Math.acos(cosLimit);
-      controls.minPolarAngle = 0.01;
+      controls.minPolarAngle = 0.001;
 
       controls.update();
+      update2D3DUI();
 
       // Ensure camera never penetrates below the terrain or gets stuck inside the control tower shaft
       if (camera.position.y < 0.65) camera.position.y = 0.65;
