@@ -64,6 +64,15 @@
       background: rgba(56, 189, 248, 0.45);
       border-radius: 6px;
     }
+    .top-bar-transition {
+      transition: transform 0.35s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.3s ease;
+      will-change: transform, opacity;
+    }
+    .top-bar-hidden {
+      opacity: 0 !important;
+      transform: translateY(-130%) !important;
+      pointer-events: none !important;
+    }
   </style>
 
   <!-- Import Map for Three.js & Addons -->
@@ -86,10 +95,10 @@
   <!-- 3D WebGL Canvas Container -->
   <div id="canvas-container" class="fixed inset-0 z-0"></div>
 
-  <!-- Top Telemetry & ANWS Project Header -->
-  <header class="fixed top-4 left-4 right-4 z-10 flex flex-wrap items-center justify-between gap-3 pointer-events-none">
-    <!-- Left Location Badge -->
-    <div class="glass-panel rounded-2xl px-5 py-3 pointer-events-auto flex items-center gap-4">
+  <!-- Top Telemetry & ANWS Project Header (Two Bars: Left ANWS, Right Live TPE) -->
+  <header id="top-header" class="fixed top-4 left-4 right-4 z-10 flex flex-wrap items-center justify-between gap-3 pointer-events-none">
+    <!-- Left Location Badge: ANWS Bar -->
+    <div id="top-anws-bar" class="glass-panel top-bar-transition rounded-2xl px-5 py-3 pointer-events-auto flex items-center gap-4">
       <div class="relative flex items-center justify-center w-3.5 h-3.5">
         <span class="pulse-dot relative inline-flex rounded-full h-3 w-3 bg-sky-400"></span>
       </div>
@@ -107,8 +116,8 @@
       </div>
     </div>
 
-    <!-- Right Interactive Controls -->
-    <div class="glass-panel rounded-2xl p-2 pointer-events-auto flex flex-wrap items-center gap-2">
+    <!-- Right Interactive Controls: Live TPE Bar -->
+    <div id="top-livetpe-bar" class="glass-panel top-bar-transition rounded-2xl p-2 pointer-events-auto flex flex-wrap items-center gap-2">
       <!-- Live RCTP ADS-B Flights Toggle -->
       <button id="toggle-flights" class="px-3 py-2 rounded-xl text-xs font-semibold bg-emerald-500/25 text-emerald-200 border border-emerald-400/50 hover:bg-emerald-500/35 transition-all flex items-center gap-1.5" title="Real-Time Taiwan Taoyuan Airport (RCTP/TPE) Live Aircraft">
         <span id="live-dot" class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
@@ -254,7 +263,33 @@
   <!-- Bottom Quick-Select Camera & Landmark Bar -->
   <footer class="fixed bottom-4 left-4 right-4 z-10 flex flex-wrap items-center justify-between gap-3 pointer-events-none">
     <div class="glass-panel rounded-2xl p-2 pointer-events-auto flex items-center gap-1.5 overflow-x-auto max-w-full">
-      <span class="mono text-[11px] text-slate-300 px-2.5 hidden md:inline">VIEWS:</span>
+      <!-- "VIEWS" Control to Show & Hide the Two Top Bars: ANWS and Live TPE -->
+      <div class="relative flex items-center shrink-0 mr-1">
+        <button id="toggle-views-topbars" class="px-2.5 py-1.5 rounded-xl text-xs font-bold tracking-wider mono flex items-center gap-1.5 bg-slate-800/90 text-sky-300 border border-sky-400/40 hover:bg-slate-700/80 hover:text-white transition-all whitespace-nowrap shadow-sm cursor-pointer select-none" title="Toggle Top Bars (ANWS & Live TPE)">
+          <span id="views-bar-eye" class="text-xs">👁️</span>
+          <span>VIEWS</span>
+          <span id="views-status-pill" class="text-[9px] px-1.5 py-0.5 rounded-full bg-emerald-500/25 text-emerald-300 border border-emerald-400/40">TOP ON</span>
+        </button>
+        <button id="views-dropdown-btn" class="ml-1 px-1.5 py-1.5 rounded-xl text-xs text-slate-400 hover:text-white hover:bg-slate-800 border border-slate-700/60 transition-all cursor-pointer" title="Customize Top Bars (ANWS / Live TPE)">
+          ▾
+        </button>
+        <!-- Dropdown Popover for Independent Toggles -->
+        <div id="views-dropdown-menu" class="absolute bottom-full left-0 mb-2 w-56 glass-panel rounded-xl p-3 shadow-2xl border border-slate-700/80 hidden z-30 mono text-xs select-none">
+          <div class="text-[10px] text-slate-400 font-semibold uppercase tracking-wider mb-2 px-1">Top Display Bars</div>
+          <label class="flex items-center justify-between p-1.5 rounded-lg hover:bg-slate-800/80 cursor-pointer">
+            <span class="text-slate-200">ANWS Telemetry</span>
+            <input type="checkbox" id="chk-anws-bar" checked class="accent-sky-400 rounded cursor-pointer">
+          </label>
+          <label class="flex items-center justify-between p-1.5 rounded-lg hover:bg-slate-800/80 cursor-pointer">
+            <span class="text-slate-200">Live TPE & Controls</span>
+            <input type="checkbox" id="chk-livetpe-bar" checked class="accent-sky-400 rounded cursor-pointer">
+          </label>
+          <div class="border-t border-slate-700/60 mt-2 pt-2 flex items-center justify-between gap-1 text-[10px]">
+            <button id="btn-show-both-top" class="px-2 py-1 rounded bg-sky-500/20 text-sky-300 hover:bg-sky-500/30 cursor-pointer">Show All</button>
+            <button id="btn-hide-both-top" class="px-2 py-1 rounded bg-slate-800 text-slate-300 hover:bg-slate-700 cursor-pointer">Hide All</button>
+          </div>
+        </div>
+      </div>
       <button data-target="hero" class="landmark-btn px-3 py-1.5 rounded-xl text-xs font-semibold bg-sky-500/30 text-sky-200 border border-sky-400/40 transition whitespace-nowrap">
         🎬 Hero Shot
       </button>
@@ -398,9 +433,14 @@
     controls.dampingFactor = 0.05;
     controls.rotateSpeed = 0.95;
     controls.zoomSpeed = 1.15;
-    controls.panSpeed = 1.05;
-    controls.zoomToCursor = true;
+    controls.panSpeed = 1.15;
+    controls.zoomToCursor = false;
     controls.screenSpacePanning = false;
+    controls.mouseButtons = {
+      LEFT: THREE.MOUSE.ROTATE,
+      MIDDLE: THREE.MOUSE.PAN,
+      RIGHT: THREE.MOUSE.PAN
+    };
     controls.minDistance = 0.2;
     controls.maxDistance = 1400;
     controls.minPolarAngle = 0.01;
@@ -4079,7 +4119,7 @@
     }
 
     // --- ZOOM TOWARD CURSOR / PINCH / DOUBLE-TAP & FREE MAP NAVIGATION ---
-    const DBL_CLICK_MS = 300;
+    const DBL_CLICK_MS = 400;
     const ZOOM_IN_FACTOR = 0.48;
     const ZOOM_OUT_FACTOR = 2.0;
     const MIN_FREE_ORBIT_DIST = 16.0; // Prevents OrbitControls from getting stuck or losing pan speed
@@ -4088,6 +4128,8 @@
     let followZoom = 1.0;
     let lastPointerType = 'mouse';
     let lastRightDown = null;
+    let lastLeftDown = null;
+    let isDoubleClickedRecently = false;
     let pendingClickTimer = null;
 
     // Touch gesture tracking for pinch-to-point, double-tap & double-tap-and-drag zoom
@@ -4097,6 +4139,7 @@
     let lastSingleTouchTap = null; // { time, x, y }
     let touchDoubleTapDrag = null; // { pointerId, startX, startY, lastY, focusPoint, isDragging }
 
+    // Pure zoom toward clicked screen point without altering camera viewing angle (0° rotation)
     function zoomTowardScreenPoint(clientX, clientY, factor) {
       isCabInteriorMode = false;
       cameraGoalPos = null;
@@ -4109,37 +4152,46 @@
       }
 
       const focusPt = getMapPointAtScreen(clientX, clientY);
-      const baseCam = zoomGoalPos ? zoomGoalPos.clone() : camera.position.clone();
-      const baseTarget = zoomGoalTarget ? zoomGoalTarget.clone() : controls.target.clone();
+      const baseCam = (zoomGoalPos ? zoomGoalPos : camera.position).clone();
+      const baseTarget = (zoomGoalTarget ? zoomGoalTarget : controls.target).clone();
+
+      // View offset vector from target to camera defines the camera's azimuth (yaw) and polar angle (pitch)
+      const offset = baseCam.clone().sub(baseTarget);
+      const curDist = Math.max(offset.length(), 0.001);
+      // Unit view vector MUST remain unchanged so the view orientation never rotates
+      const viewDirUnit = offset.clone().normalize();
 
       if (factor < 1.0) {
-        // Zoom in toward the clicked / double-tapped point on the 3D map (never forced onto the tower)
-        const toCam = baseCam.clone().sub(focusPt);
-        const distToFocus = toCam.length();
-        const newDist = Math.max(8.0, distToFocus * factor);
-        const newCamPos = focusPt.clone().add(toCam.normalize().multiplyScalar(newDist));
-        newCamPos.y = Math.max(2.2, newCamPos.y);
+        // Zoom in: new distance from camera to target
+        const newDist = Math.max(8.0, curDist * factor);
 
-        // Shift orbit target onto the map focus point and ensure at least MIN_FREE_ORBIT_DIST ahead
-        const viewDir = focusPt.clone().sub(newCamPos).normalize();
-        const targetDist = Math.max(MIN_FREE_ORBIT_DIST, newCamPos.distanceTo(focusPt));
-        const newTarget = newCamPos.clone().addScaledVector(viewDir, targetDist);
-        newTarget.y = Math.max(GROUND_SURFACE_Y, Math.min(newTarget.y, focusPt.y + 4.0));
+        // Slide target toward the clicked point on the 3D map
+        const moveRatio = THREE.MathUtils.clamp(1.0 - factor, 0.25, 0.65);
+        const newTarget = baseTarget.clone().lerp(focusPt, moveRatio);
+        newTarget.y = Math.max(GROUND_SURFACE_Y, THREE.MathUtils.lerp(baseTarget.y, focusPt.y, 0.5));
+
+        // Place new camera position along the EXACT same view direction from the new target
+        // This mathematically guarantees 0° rotation: viewing angles remain identical
+        const newCamPos = newTarget.clone().addScaledVector(viewDirUnit, newDist);
+        newCamPos.y = Math.max(2.2, newCamPos.y);
 
         zoomGoalPos = newCamPos;
         zoomGoalTarget = newTarget;
       } else {
-        // Zoom out away from current target while relaxing target toward ground map level
-        const offset = baseCam.clone().sub(baseTarget);
-        const curDist = Math.max(8.0, offset.length());
+        // Zoom out along the exact same view direction
         const newDist = Math.min(controls.maxDistance, curDist * factor);
-        const relaxedTarget = baseTarget.clone();
-        relaxedTarget.y = THREE.MathUtils.lerp(relaxedTarget.y, 2.0, 0.45);
-        zoomGoalTarget = relaxedTarget;
-        zoomGoalPos = relaxedTarget.clone().add(offset.normalize().multiplyScalar(newDist));
-        zoomGoalPos.y = Math.max(3.0, zoomGoalPos.y);
+        const newTarget = baseTarget.clone();
+        newTarget.y = THREE.MathUtils.lerp(newTarget.y, 2.0, 0.45);
+
+        const newCamPos = newTarget.clone().addScaledVector(viewDirUnit, newDist);
+        newCamPos.y = Math.max(3.0, newCamPos.y);
+
+        zoomGoalTarget = newTarget;
+        zoomGoalPos = newCamPos;
       }
     }
+
+    let isMiddleMouseDown = false;
 
     renderer.domElement.addEventListener('pointermove', (e) => {
       if (activeTouchPointers.has(e.pointerId)) {
@@ -4205,6 +4257,13 @@
 
       if (document.body.classList.contains('bg-only') || !window.matchMedia('(hover: hover) and (pointer: fine)').matches) return;
       if (e.pointerType !== 'mouse' && e.pointerType !== 'pen') return;
+
+      if (isMiddleMouseDown || (e.buttons & 4)) {
+        renderer.domElement.style.cursor = 'grabbing';
+        return;
+      }
+      if (e.buttons !== 0) return;
+
       const ent = aircraftAtPointer(e);
       showOnlyAircraftTag(ent ? ent.id : pinnedFlightId);
 
@@ -4249,6 +4308,39 @@
       zoomGoalPos = null;
       zoomGoalTarget = null;
       isFlyingToTrackedAircraft = false;
+
+      if (e.pointerType === 'mouse' && e.button === 0) {
+        const now = performance.now();
+        if (
+          lastLeftDown &&
+          now - lastLeftDown.time <= DBL_CLICK_MS &&
+          Math.hypot(e.clientX - lastLeftDown.x, e.clientY - lastLeftDown.y) <= 8
+        ) {
+          // Second click of a double-click: cancel any pending landmark/flight selection
+          lastLeftDown = null;
+          isDoubleClickedRecently = true;
+          clearTimeout(pendingClickTimer);
+          pendingClickTimer = null;
+          setTimeout(() => {
+            isDoubleClickedRecently = false;
+          }, DBL_CLICK_MS + 60);
+        } else {
+          lastLeftDown = { time: now, x: e.clientX, y: e.clientY };
+        }
+      }
+
+      if (e.pointerType === 'mouse' && e.button === 1) {
+        // Middle mouse button pressed: suppress Windows/Chrome autoscroll and enable smooth map panning
+        e.preventDefault();
+        isMiddleMouseDown = true;
+        renderer.domElement.style.cursor = 'grabbing';
+        if (trackedFlightId) {
+          trackedFlightId = null;
+          const stopBtn = document.getElementById('stop-track-btn');
+          if (stopBtn) stopBtn.classList.add('hidden');
+        }
+        isCabInteriorMode = false;
+      }
 
       if (e.pointerType === 'touch') {
         activeTouchPointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
@@ -4302,16 +4394,18 @@
       }
     });
 
-    // Left-button double-click → zoom in toward clicked point on the 3D map
+    // Left-button double-click → zoom in toward clicked point on the 3D map without rotating view
     renderer.domElement.addEventListener('dblclick', (e) => {
       if (document.body.classList.contains('bg-only') || lastPointerType === 'touch') return;
       if (e.button !== 0) return;
       clearTimeout(pendingClickTimer);
       pendingClickTimer = null;
+      cameraGoalPos = null;
+      targetGoalPos = null;
       zoomTowardScreenPoint(e.clientX, e.clientY, ZOOM_IN_FACTOR);
     });
 
-    // Mouse wheel / trackpad scroll zoom with automatic target advancement so camera never gets stuck
+    // Mouse wheel / trackpad scroll zoom: purely scales distance along current view direction (0° rotation)
     renderer.domElement.addEventListener('wheel', (e) => {
       if (document.body.classList.contains('bg-only')) return;
       isCabInteriorMode = false;
@@ -4324,28 +4418,61 @@
       if (trackedFlightId && activeAircraftMap.has(trackedFlightId)) {
         const factor = e.deltaY < 0 ? 0.88 : 1.14;
         followZoom = THREE.MathUtils.clamp(followZoom * factor, 0.25, 4.0);
+        e.preventDefault();
+        e.stopImmediatePropagation();
         return;
       }
 
-      // Steer target toward the cursor's ground point on the 3D map so wheel zoom never locks onto the control tower
+      // Calculate zoom scaling factor from wheel delta
+      const zoomFactor = e.deltaY < 0 ? 0.88 : 1.14;
+
+      // Current view offset from target to camera defines the camera's azimuth (yaw) and polar angle (pitch)
+      const offset = camera.position.clone().sub(controls.target);
+      const curDist = Math.max(offset.length(), 0.001);
+      // Unit view vector MUST remain unchanged so the view orientation never rotates
+      const viewDirUnit = offset.clone().normalize();
+
       if (e.deltaY < 0) {
-        const cursorGroundPt = getMapPointAtScreen(e.clientX, e.clientY);
-        controls.target.lerp(cursorGroundPt, 0.12);
-      } else if (e.deltaY > 0 && controls.target.y > 2.5) {
-        controls.target.y = THREE.MathUtils.lerp(controls.target.y, 1.6, 0.12);
+        // Zooming in: calculate new distance from camera to target
+        const newDist = Math.max(6.0, curDist * zoomFactor);
+
+        // Slide target smoothly toward the clicked/cursor ground point on the 3D map
+        const focusPt = getMapPointAtScreen(e.clientX, e.clientY);
+        const newTarget = controls.target.clone().lerp(focusPt, 0.16);
+        newTarget.y = Math.max(GROUND_SURFACE_Y, THREE.MathUtils.lerp(controls.target.y, focusPt.y, 0.3));
+
+        // Place camera at new target + exact same view direction * new distance
+        // This mathematically guarantees 0° rotation: viewing angles remain identical
+        const newCam = newTarget.clone().addScaledVector(viewDirUnit, newDist);
+        newCam.y = Math.max(1.8, newCam.y);
+
+        controls.target.copy(newTarget);
+        camera.position.copy(newCam);
+      } else {
+        // Zooming out: scale distance along the exact same view direction
+        const newDist = Math.min(controls.maxDistance, curDist * zoomFactor);
+        const newTarget = controls.target.clone();
+        if (newTarget.y > 2.0) {
+          newTarget.y = THREE.MathUtils.lerp(newTarget.y, GROUND_SURFACE_Y, 0.15);
+        }
+
+        const newCam = newTarget.clone().addScaledVector(viewDirUnit, newDist);
+        newCam.y = Math.max(2.5, newCam.y);
+
+        controls.target.copy(newTarget);
+        camera.position.copy(newCam);
       }
 
-      const curDist = camera.position.distanceTo(controls.target);
-      if (e.deltaY < 0 && curDist <= MIN_FREE_ORBIT_DIST + 4.0) {
-        // Advance both camera and target toward the cursor ray so zooming in never gets stuck against the tower
-        pointer.x = (e.clientX / window.innerWidth) * 2 - 1;
-        pointer.y = -(e.clientY / window.innerHeight) * 2 + 1;
-        raycaster.setFromCamera(pointer, camera);
-        const step = Math.min(8.0, Math.max(1.2, Math.abs(e.deltaY) * 0.03));
-        camera.position.addScaledVector(raycaster.ray.direction, step);
-        controls.target.copy(camera.position).addScaledVector(raycaster.ray.direction, MIN_FREE_ORBIT_DIST);
+      // If close to controls.target, keep target ahead along the view direction so controls never get stuck
+      const newOffset = camera.position.clone().sub(controls.target);
+      const newCurDist = newOffset.length();
+      if (newCurDist < MIN_FREE_ORBIT_DIST && newCurDist > 0.001) {
+        controls.target.copy(camera.position).addScaledVector(viewDirUnit, -MIN_FREE_ORBIT_DIST);
       }
-    }, { passive: true });
+
+      e.preventDefault();
+      e.stopImmediatePropagation();
+    }, { passive: false });
 
     renderer.domElement.addEventListener('pointerup', (e) => {
       activeTouchPointers.delete(e.pointerId);
@@ -4367,6 +4494,7 @@
 
       if (document.body.classList.contains('bg-only')) return;
       if (e.pointerType === 'mouse' && e.button !== 0) return;
+      if (isDoubleClickedRecently) return;
       const dist = Math.hypot(e.clientX - pointerDownPos.x, e.clientY - pointerDownPos.y);
       if (dist > 8) return;
 
@@ -4421,6 +4549,165 @@
         } else if (hitObj.userData.flightId || hitObj.userData.bayData) {
           action();
         }
+      }
+    });
+
+    // Global mouse/pointer handlers for middle mouse button pan release & autoscroll suppression
+    window.addEventListener('pointerup', (e) => {
+      if (e.button === 1 || !(e.buttons & 4)) {
+        isMiddleMouseDown = false;
+        if (renderer.domElement.style.cursor === 'grabbing') {
+          renderer.domElement.style.cursor = 'default';
+        }
+      }
+    });
+
+    renderer.domElement.addEventListener('mousedown', (e) => {
+      if (e.button === 1) e.preventDefault();
+    });
+
+    renderer.domElement.addEventListener('auxclick', (e) => {
+      if (e.button === 1) e.preventDefault();
+    });
+
+    // --- TOP BARS (ANWS & LIVE TPE) VISIBILITY CONTROLLER ---
+    const topBarsState = {
+      anws: true,
+      liveTpe: true
+    };
+
+    function updateTopBarsVisibility() {
+      const anwsBar = document.getElementById('top-anws-bar');
+      const livetpeBar = document.getElementById('top-livetpe-bar');
+      const viewsIcon = document.getElementById('views-bar-eye');
+      const viewsBtn = document.getElementById('toggle-views-topbars');
+      const viewsStatus = document.getElementById('views-status-pill');
+      const chkAnws = document.getElementById('chk-anws-bar');
+      const chkLiveTpe = document.getElementById('chk-livetpe-bar');
+
+      if (anwsBar) {
+        if (topBarsState.anws) {
+          anwsBar.classList.remove('top-bar-hidden');
+        } else {
+          anwsBar.classList.add('top-bar-hidden');
+        }
+      }
+
+      if (livetpeBar) {
+        if (topBarsState.liveTpe) {
+          livetpeBar.classList.remove('top-bar-hidden');
+        } else {
+          livetpeBar.classList.add('top-bar-hidden');
+        }
+      }
+
+      if (chkAnws) chkAnws.checked = topBarsState.anws;
+      if (chkLiveTpe) chkLiveTpe.checked = topBarsState.liveTpe;
+
+      const anyVisible = topBarsState.anws || topBarsState.liveTpe;
+      const allVisible = topBarsState.anws && topBarsState.liveTpe;
+
+      if (viewsIcon) {
+        viewsIcon.textContent = allVisible ? '👁️' : (anyVisible ? '◐' : '🙈');
+      }
+
+      if (viewsStatus) {
+        if (allVisible) {
+          viewsStatus.textContent = 'TOP ON';
+          viewsStatus.className = 'text-[9px] px-1.5 py-0.5 rounded-full bg-emerald-500/25 text-emerald-300 border border-emerald-400/40';
+        } else if (anyVisible) {
+          viewsStatus.textContent = 'PARTIAL';
+          viewsStatus.className = 'text-[9px] px-1.5 py-0.5 rounded-full bg-amber-500/25 text-amber-300 border border-amber-400/40';
+        } else {
+          viewsStatus.textContent = 'TOP OFF';
+          viewsStatus.className = 'text-[9px] px-1.5 py-0.5 rounded-full bg-slate-700/60 text-slate-400 border border-slate-600/50';
+        }
+      }
+
+      if (viewsBtn) {
+        viewsBtn.title = allVisible
+          ? 'Click to Hide Top Bars (ANWS & Live TPE)'
+          : 'Click to Show Top Bars (ANWS & Live TPE)';
+      }
+    }
+
+    const toggleViewsTopBarsBtn = document.getElementById('toggle-views-topbars');
+    if (toggleViewsTopBarsBtn) {
+      toggleViewsTopBarsBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const anyVisible = topBarsState.anws || topBarsState.liveTpe;
+        if (anyVisible) {
+          topBarsState.anws = false;
+          topBarsState.liveTpe = false;
+        } else {
+          topBarsState.anws = true;
+          topBarsState.liveTpe = true;
+        }
+        updateTopBarsVisibility();
+      });
+    }
+
+    const viewsDropdownBtn = document.getElementById('views-dropdown-btn');
+    const viewsDropdownMenu = document.getElementById('views-dropdown-menu');
+    if (viewsDropdownBtn && viewsDropdownMenu) {
+      viewsDropdownBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        viewsDropdownMenu.classList.toggle('hidden');
+      });
+    }
+
+    const chkAnwsBar = document.getElementById('chk-anws-bar');
+    if (chkAnwsBar) {
+      chkAnwsBar.addEventListener('change', (e) => {
+        topBarsState.anws = e.target.checked;
+        updateTopBarsVisibility();
+      });
+    }
+
+    const chkLiveTpeBar = document.getElementById('chk-livetpe-bar');
+    if (chkLiveTpeBar) {
+      chkLiveTpeBar.addEventListener('change', (e) => {
+        topBarsState.liveTpe = e.target.checked;
+        updateTopBarsVisibility();
+      });
+    }
+
+    const btnShowBothTop = document.getElementById('btn-show-both-top');
+    if (btnShowBothTop) {
+      btnShowBothTop.addEventListener('click', (e) => {
+        e.stopPropagation();
+        topBarsState.anws = true;
+        topBarsState.liveTpe = true;
+        updateTopBarsVisibility();
+      });
+    }
+
+    const btnHideBothTop = document.getElementById('btn-hide-both-top');
+    if (btnHideBothTop) {
+      btnHideBothTop.addEventListener('click', (e) => {
+        e.stopPropagation();
+        topBarsState.anws = false;
+        topBarsState.liveTpe = false;
+        updateTopBarsVisibility();
+      });
+    }
+
+    window.addEventListener('click', (e) => {
+      if (viewsDropdownMenu && !viewsDropdownMenu.classList.contains('hidden')) {
+        if (!viewsDropdownMenu.contains(e.target) && !viewsDropdownBtn.contains(e.target)) {
+          viewsDropdownMenu.classList.add('hidden');
+        }
+      }
+    });
+
+    // Optional keyboard shortcut: Press 'v' or 'V' to toggle top bars
+    window.addEventListener('keydown', (e) => {
+      if (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA')) return;
+      if (e.key === 'v' || e.key === 'V') {
+        const anyVisible = topBarsState.anws || topBarsState.liveTpe;
+        topBarsState.anws = !anyVisible;
+        topBarsState.liveTpe = !anyVisible;
+        updateTopBarsVisibility();
       }
     });
 
@@ -4660,7 +4947,7 @@
       // Ensure camera never penetrates below the terrain or gets stuck inside the control tower shaft
       if (camera.position.y < 0.65) camera.position.y = 0.65;
       if (controls.target.y < GROUND_SURFACE_Y) controls.target.y = GROUND_SURFACE_Y;
-      if (!isCabInteriorMode && !cameraGoalPos && camera.position.y < 68.0) {
+      if (!isCabInteriorMode && !cameraGoalPos && !zoomGoalPos && camera.position.y < 68.0) {
         const towerDx = camera.position.x - (-0.45);
         const towerDz = camera.position.z;
         const towerDist = Math.hypot(towerDx, towerDz);
@@ -4691,7 +4978,7 @@
       renderer.render(scene, camera);
     }
 
-    // Automatically detect current time and apply Daylight or Night  mode
+    // Automatically detect current time and apply Daylight or Night mode
     syncAutoLighting();
     setInterval(syncAutoLighting, 60000);
     animate();
