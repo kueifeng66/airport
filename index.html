@@ -441,6 +441,10 @@
       MIDDLE: THREE.MOUSE.PAN,
       RIGHT: THREE.MOUSE.PAN
     };
+    controls.touches = {
+      ONE: THREE.TOUCH.PAN,
+      TWO: THREE.TOUCH.DOLLY_PAN
+    };
     controls.minDistance = 0.2;
     controls.maxDistance = 1400;
     controls.minPolarAngle = 0.01;
@@ -4132,10 +4136,13 @@
     let isDoubleClickedRecently = false;
     let pendingClickTimer = null;
 
-    // Touch gesture tracking for pinch-to-point, double-tap & double-tap-and-drag zoom
+    // Touch gesture tracking for pinch-to-zoom, pinch-to-rotate & double-tap zoom
     const activeTouchPointers = new Map();
     let lastPinchDist = null;
-    let lastPinchFocusPt = null;
+    let lastPinchAngle = null;
+    let lastPinchMid = null;
+    let pinchRotAccum = 0;
+    let isPinchRotating = false;
     let lastSingleTouchTap = null; // { time, x, y }
     let touchDoubleTapDrag = null; // { pointerId, startX, startY, lastY, focusPoint, isDragging }
 
@@ -4198,28 +4205,91 @@
         activeTouchPointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
       }
 
-      // Handle 2-finger pinch zoom: steer controls.target toward the pinch midpoint on the 3D map
-      // (Three.js r160 OrbitControls only applies zoomToCursor on mouse wheel, not touch pinch)
+      // Handle 2-finger gestures on iPhone / touch devices:
+      // - Pinch in/out to Zoom (strictly preserving view angle, 0° rotation)
+      // - Pinch twist to Rotate (rotates azimuth only when intentionally twisting fingers)
+      // - Two-finger pan (translates camera and target together across ground plane)
       if (activeTouchPointers.size === 2 && !isCabInteriorMode && !trackedFlightId) {
         const pts = Array.from(activeTouchPointers.values());
-        const pinchDist = Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y);
-        const midX = (pts[0].x + pts[1].x) * 0.5;
-        const midY = (pts[0].y + pts[1].y) * 0.5;
-        if (!lastPinchFocusPt) {
-          lastPinchFocusPt = getMapPointAtScreen(midX, midY);
-        }
-        if (lastPinchDist !== null) {
-          const deltaPinch = pinchDist - lastPinchDist;
-          if (deltaPinch > 0.4) {
-            // Pinching out (zooming in): steer target toward the 3D map point under the pinch midpoint
-            const steerAmt = THREE.MathUtils.clamp(deltaPinch * 0.0045, 0, 0.16);
-            controls.target.lerp(lastPinchFocusPt, steerAmt);
-          } else if (deltaPinch < -0.4) {
-            // Pinching in (zooming out): lower elevated target to ground map level
-            controls.target.y = THREE.MathUtils.lerp(controls.target.y, 1.6, 0.1);
+        const p1 = pts[0];
+        const p2 = pts[1];
+        const curDist = Math.hypot(p1.x - p2.x, p1.y - p2.y);
+        const curAngle = Math.atan2(p2.y - p1.y, p2.x - p1.x);
+        const curMid = { x: (p1.x + p2.x) * 0.5, y: (p1.y + p2.y) * 0.5 };
+
+        if (lastPinchDist && lastPinchAngle !== null && lastPinchMid) {
+          const deltaDist = curDist - lastPinchDist;
+          let deltaAngle = curAngle - lastPinchAngle;
+          // Normalize deltaAngle to [-PI, PI]
+          deltaAngle = (deltaAngle + Math.PI * 3) % (Math.PI * 2) - Math.PI;
+
+          const deltaMidX = curMid.x - lastPinchMid.x;
+          const deltaMidY = curMid.y - lastPinchMid.y;
+          const midMoveDist = Math.hypot(deltaMidX, deltaMidY);
+
+          pinchRotAccum += deltaAngle;
+
+          // 1. PINCH GESTURE TO ROTATE (Two-finger twist):
+          // Detect intentional rotation gesture (cumulative angle change >= 2.5°)
+          if (!isPinchRotating && Math.abs(pinchRotAccum) > 0.045 && Math.abs(deltaAngle) > 0.008) {
+            isPinchRotating = true;
+          }
+
+          if (isPinchRotating && Math.abs(deltaAngle) > 0.003) {
+            // Rotate camera offset around world Y axis (0, 1, 0)
+            // Polar angle (tilt) is kept 100% constant!
+            const offset = camera.position.clone().sub(controls.target);
+            offset.applyAxisAngle(new THREE.Vector3(0, 1, 0), -deltaAngle * 1.15);
+            camera.position.copy(controls.target).add(offset);
+          }
+
+          // 2. PINCH TO ZOOM IN OR ZOOM OUT (WITHOUT ROTATING):
+          // Scale distance strictly along the current view direction vector
+          if (Math.abs(deltaDist) > 0.6) {
+            const zoomRatio = curDist / lastPinchDist;
+            const offset = camera.position.clone().sub(controls.target);
+            const curOrbitDist = Math.max(offset.length(), 0.001);
+            // Unit view direction vector: MUST remain unchanged so zoom never rotates
+            const viewDirUnit = offset.clone().normalize();
+
+            const newDist = THREE.MathUtils.clamp(curOrbitDist / zoomRatio, 6.0, controls.maxDistance);
+
+            // Gently slide target toward the pinch midpoint on the 3D map
+            const focusPt = getMapPointAtScreen(curMid.x, curMid.y);
+            const moveRatio = THREE.MathUtils.clamp(Math.abs(1 - 1 / zoomRatio) * 0.4, 0, 0.15);
+            controls.target.lerp(focusPt, moveRatio);
+            controls.target.y = Math.max(GROUND_SURFACE_Y, controls.target.y);
+
+            // Place camera strictly along viewDirUnit: GUARANTEES 0° UNINTENDED ROTATION
+            const newCam = controls.target.clone().addScaledVector(viewDirUnit, newDist);
+            newCam.y = Math.max(1.8, newCam.y);
+            camera.position.copy(newCam);
+          }
+
+          // 3. TWO-FINGER PAN (Translating midpoint across the ground):
+          if (midMoveDist > 1.2 && !isPinchRotating) {
+            const viewOffset = camera.position.clone().sub(controls.target);
+            const viewDist = viewOffset.length();
+            const viewDir = viewOffset.clone().normalize();
+
+            const camRight = new THREE.Vector3();
+            camRight.crossVectors(camera.up, viewDir).normalize();
+            const camFwd = new THREE.Vector3();
+            camFwd.crossVectors(camRight, camera.up).normalize();
+
+            const panScale = (viewDist / window.innerHeight) * 1.5;
+            const panVec = camRight.clone().multiplyScalar(deltaMidX * panScale)
+              .addScaledVector(camFwd, -deltaMidY * panScale);
+
+            controls.target.add(panVec);
+            camera.position.add(panVec);
+            controls.target.y = Math.max(GROUND_SURFACE_Y, controls.target.y);
           }
         }
-        lastPinchDist = pinchDist;
+
+        lastPinchDist = curDist;
+        lastPinchAngle = curAngle;
+        lastPinchMid = curMid;
         return;
       }
 
@@ -4278,7 +4348,11 @@
       activeTouchPointers.delete(e.pointerId);
       if (activeTouchPointers.size < 2) {
         lastPinchDist = null;
-        lastPinchFocusPt = null;
+        lastPinchAngle = null;
+        lastPinchMid = null;
+        pinchRotAccum = 0;
+        isPinchRotating = false;
+        controls.enabled = true;
       }
       if (touchDoubleTapDrag && e.pointerId === touchDoubleTapDrag.pointerId) {
         touchDoubleTapDrag = null;
@@ -4291,7 +4365,11 @@
       activeTouchPointers.delete(e.pointerId);
       if (activeTouchPointers.size < 2) {
         lastPinchDist = null;
-        lastPinchFocusPt = null;
+        lastPinchAngle = null;
+        lastPinchMid = null;
+        pinchRotAccum = 0;
+        isPinchRotating = false;
+        controls.enabled = true;
       }
       if (touchDoubleTapDrag && e.pointerId === touchDoubleTapDrag.pointerId) {
         touchDoubleTapDrag = null;
@@ -4346,7 +4424,10 @@
         activeTouchPointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
         if (activeTouchPointers.size === 1) {
           lastPinchDist = null;
-          lastPinchFocusPt = null;
+          lastPinchAngle = null;
+          lastPinchMid = null;
+          pinchRotAccum = 0;
+          isPinchRotating = false;
           const now = performance.now();
           if (
             lastSingleTouchTap &&
@@ -4369,15 +4450,18 @@
             controls.enableRotate = false;
           }
         } else if (activeTouchPointers.size === 2) {
-          // Multi-touch (pinch / two-finger pan): initialize pinch midpoint focus on the 3D map
+          // Multi-touch (pinch-to-zoom / pinch-to-rotate): initialize gesture tracking
           lastSingleTouchTap = null;
           if (touchDoubleTapDrag) {
             touchDoubleTapDrag = null;
-            controls.enableRotate = true;
           }
+          controls.enabled = false; // Disable OrbitControls while 2-finger custom gesture is active
           const pts = Array.from(activeTouchPointers.values());
           lastPinchDist = Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y);
-          lastPinchFocusPt = getMapPointAtScreen((pts[0].x + pts[1].x) * 0.5, (pts[0].y + pts[1].y) * 0.5);
+          lastPinchAngle = Math.atan2(pts[1].y - pts[0].y, pts[1].x - pts[0].x);
+          lastPinchMid = { x: (pts[0].x + pts[1].x) * 0.5, y: (pts[0].y + pts[1].y) * 0.5 };
+          pinchRotAccum = 0;
+          isPinchRotating = false;
         }
       }
 
@@ -4478,7 +4562,11 @@
       activeTouchPointers.delete(e.pointerId);
       if (activeTouchPointers.size < 2) {
         lastPinchDist = null;
-        lastPinchFocusPt = null;
+        lastPinchAngle = null;
+        lastPinchMid = null;
+        pinchRotAccum = 0;
+        isPinchRotating = false;
+        controls.enabled = true;
       }
 
       if (touchDoubleTapDrag && e.pointerId === touchDoubleTapDrag.pointerId) {
