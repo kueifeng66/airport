@@ -1906,6 +1906,7 @@
       });
       const markerMesh = new THREE.Mesh(standMarkerGeo, markerMat);
       markerMesh.rotation.x = -Math.PI / 2;
+      if (isNorthSide && !isNeCargo) markerMesh.rotation.z = Math.PI;
       markerMesh.position.set(bay.pos.x, 0.18, bay.pos.z + markerOffsetZ);
       markerMesh.userData.bayData = bay;
       terminalGroup.add(markerMesh);
@@ -1948,17 +1949,27 @@
         terminalGroup.add(rotunda);
         interactiveMeshes.push(rotunda);
 
-        // Stand Number ID Signboard mounted facing the taxi lane
+        // Stand Number ID Signboard mounted facing the apron (both faces oriented left-to-right, never mirrored)
         const signMat = new THREE.MeshBasicMaterial({ 
           map: getStandTexture(bay.id),
-          side: THREE.DoubleSide
+          side: THREE.FrontSide
         });
-        const signMesh = new THREE.Mesh(new THREE.PlaneGeometry(2.4, 1.2), signMat);
-        signMesh.position.set(bay.pos.x, 5.8, rotundaZ + (isNorthSide ? -1.65 : 1.65));
-        if (!isNorthSide) signMesh.rotation.y = Math.PI;
-        signMesh.userData.bayData = bay;
-        terminalGroup.add(signMesh);
-        interactiveMeshes.push(signMesh);
+        const signGeo = new THREE.PlaneGeometry(2.4, 1.2);
+        const signZ = rotundaZ + (isNorthSide ? -1.65 : 1.65);
+
+        const signFront = new THREE.Mesh(signGeo, signMat);
+        signFront.position.set(bay.pos.x, 5.8, signZ + (isNorthSide ? -0.02 : 0.02));
+        if (isNorthSide) signFront.rotation.y = Math.PI;
+        signFront.userData.bayData = bay;
+        terminalGroup.add(signFront);
+        interactiveMeshes.push(signFront);
+
+        const signBack = new THREE.Mesh(signGeo, signMat);
+        signBack.position.set(bay.pos.x, 5.8, signZ + (isNorthSide ? 0.02 : -0.02));
+        if (!isNorthSide) signBack.rotation.y = Math.PI;
+        signBack.userData.bayData = bay;
+        terminalGroup.add(signBack);
+        interactiveMeshes.push(signBack);
       } else {
         // Remote & Cargo Stands: Illuminated Stand Post
         const postZ = isNeCargo ? (bay.pos.z - 4.8) : bay.pos.z + (isNorthSide ? -5.5 : 5.5);
@@ -1968,15 +1979,23 @@
 
         const signMat = new THREE.MeshBasicMaterial({ 
           map: getStandTexture(bay.id),
-          side: THREE.DoubleSide
+          side: THREE.FrontSide
         });
-        const signMesh = new THREE.Mesh(new THREE.PlaneGeometry(2.2, 1.1), signMat);
-        signMesh.position.set(bay.pos.x + 3.8, 3.2, postZ);
-        // NE Cargo stands face South (+Z) towards the apron and viewer
-        if (isNorthSide && !isNeCargo) signMesh.rotation.y = Math.PI;
-        signMesh.userData.bayData = bay;
-        terminalGroup.add(signMesh);
-        interactiveMeshes.push(signMesh);
+        const signGeo = new THREE.PlaneGeometry(2.2, 1.1);
+
+        // Place properly oriented sign faces in front of both sides of the post so it is never blocked or mirrored
+        const signSouth = new THREE.Mesh(signGeo, signMat);
+        signSouth.position.set(bay.pos.x + 3.8, 3.2, postZ + 0.16);
+        signSouth.userData.bayData = bay;
+        terminalGroup.add(signSouth);
+        interactiveMeshes.push(signSouth);
+
+        const signNorth = new THREE.Mesh(signGeo, signMat);
+        signNorth.position.set(bay.pos.x + 3.8, 3.2, postZ - 0.16);
+        signNorth.rotation.y = Math.PI;
+        signNorth.userData.bayData = bay;
+        terminalGroup.add(signNorth);
+        interactiveMeshes.push(signNorth);
       }
     });
 
@@ -4279,7 +4298,7 @@
             // Rotate camera offset around world Y axis (0, 1, 0)
             // Polar angle (tilt) is kept 100% constant!
             const offset = camera.position.clone().sub(controls.target);
-            offset.applyAxisAngle(new THREE.Vector3(0, 1, 0), -deltaAngle * 1.15);
+            offset.applyAxisAngle(new THREE.Vector3(0, 1, 0), deltaAngle * 1.15);
             camera.position.copy(controls.target).add(offset);
           }
 
