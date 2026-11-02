@@ -1513,10 +1513,12 @@
       new THREE.MeshStandardMaterial({ map: signTex, roughness: 0.4 })
     );
     signBoard.position.set(-6, 3.2, 46);
+    signBoard.castShadow = true;
     baseBuildingGroup.add(signBoard);
 
     const signPost = new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.14, 3.2, 8), greyCladdingMat);
-    signPost.position.set(-6, 1.6, 46);
+    signPost.position.set(-6, 1.6, 45.78);
+    signPost.castShadow = true;
     baseBuildingGroup.add(signPost);
 
     // Staff Parking Lot Cars
